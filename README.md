@@ -749,7 +749,7 @@ MIT License - see [LICENSE](LICENSE) file
 - **Veda Sheersh Maringanti** - Original implementation
 - **Georg K. Gerber** - Principal Investigator
 - **Vanni Bucci** - Co-Principal Investigator
-- **Ziyuan Huang** - Code and Architecture Improvements
+- **Ziyuan Huang** - Code and Architecture Improvements with QA
 
 ---
 

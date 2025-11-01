@@ -131,8 +131,9 @@ def example_4_pytorch_datasets():
         train_ratio=0.8,
         batch_size=16
     )
-    print(f"  Train: {len(train_loader.dataset)} samples, {len(train_loader)} batches")
-    print(f"  Val: {len(val_loader.dataset)} samples, {len(val_loader)} batches")
+    # Static analyzer doesn't recognize Dataset.__len__, but it exists at runtime
+    print(f"  Train: {len(train_loader.dataset)} samples, {len(train_loader)} batches")  # type: ignore
+    print(f"  Val: {len(val_loader.dataset)} samples, {len(val_loader)} batches")  # type: ignore
     print()
 
 
@@ -205,9 +206,10 @@ def example_6_complete_workflow():
     )
     test_loader = create_data_loader(X_test, y_test, batch_size=8, shuffle=False)
     
-    print(f"  Train: {len(train_loader.dataset)} samples")
-    print(f"  Val: {len(val_loader.dataset)} samples")
-    print(f"  Test: {len(test_loader.dataset)} samples")
+    # Static analyzer doesn't recognize Dataset.__len__, but it exists at runtime
+    print(f"  Train: {len(train_loader.dataset)} samples")  # type: ignore
+    print(f"  Val: {len(val_loader.dataset)} samples")  # type: ignore
+    print(f"  Test: {len(test_loader.dataset)} samples")  # type: ignore
     
     print("\nStep 4: Ready for model training!")
     print("  Use train_loader for training")

@@ -68,11 +68,13 @@ class SpatialAgg(nn.Module):
     We use the heavyside logistic function to calculate the
     importance weights of each OTU for a detector and then normalize.
     """
+    dist: torch.Tensor  # Type hint for buffer
+    
     def __init__(self, num_rules, num_otus, dist):
         super(SpatialAgg, self).__init__()
         # Initialize phylo. distance matrix as a parameter
         # with requires_grad = False
-        self.register_buffer('dist', torch.from_numpy(dist))
+        self.register_buffer('dist', torch.from_numpy(dist).float())
 
         # OTU selection bandwidth
         # All OTUs within kappa radius are deemed to be selected
@@ -98,7 +100,7 @@ class SpatialAgg(nn.Module):
 
     def init_params(self, init_args):
         # Initialize kappa parameter
-        self.kappa.data = torch.from_numpy(inv_transf_log(init_args['kappa_init'], 0, self.dist.max().item())).float()
+        self.kappa.data = torch.from_numpy(inv_transf_log(init_args['kappa_init'], 0, self.dist.max().item())).float().to(self.kappa.device)
 
         return
 
@@ -109,6 +111,8 @@ class SpatialAggDynamic(nn.Module):
     We use the heavyside logistic function to calculate the
     importance weights of each OTU for a detector and then normalize.
     """
+    dist: torch.Tensor  # Type hint for buffer
+    
     def __init__(self, num_rules, num_otu_centers, dist, emb_dim, num_otus):
         super(SpatialAggDynamic, self).__init__()
         # Initialize phylo. distance matrix as a parameter
@@ -116,7 +120,7 @@ class SpatialAggDynamic(nn.Module):
         self.num_rules = num_rules
         self.num_otu_centers = num_otu_centers
         self.emb_dim = emb_dim
-        self.register_buffer('dist', torch.from_numpy(dist))
+        self.register_buffer('dist', torch.from_numpy(dist).float())
 
         # OTU centers
         self.eta = nn.Parameter(torch.Tensor(num_rules, num_otu_centers, emb_dim))
@@ -152,8 +156,8 @@ class SpatialAggDynamic(nn.Module):
 
     def init_params(self, init_args):
         # Initialize kappa parameter
-        self.kappa.data = torch.from_numpy(init_args['kappa_init']).log().float()
-        self.eta.data = torch.from_numpy(init_args['eta_init']).float()
+        self.kappa.data = torch.from_numpy(init_args['kappa_init']).log().float().to(self.kappa.device)
+        self.eta.data = torch.from_numpy(init_args['eta_init']).float().to(self.eta.device)
 
         return
 
@@ -209,7 +213,7 @@ class TimeAgg(nn.Module):
         self.wts_slope = time_wts_unnorm_slope
 
         # Normalize importance time weights
-        time_wts = (time_wts_unnorm).div(time_wts_unnorm.sum(dim=-1, keepdims=True) + 1e-8)
+        time_wts = (time_wts_unnorm).div(time_wts_unnorm.sum(dim=-1, keepdim=True) + 1e-8)
 
         if torch.isnan(time_wts).any():
             print(time_wts_unnorm.sum(-1))
@@ -245,10 +249,10 @@ class TimeAgg(nn.Module):
 
     def init_params(self, init_args):
         # # Initialize mu and sigma parameter
-        self.abun_a.data = torch.from_numpy(logit(init_args['abun_a_init'])).float()
-        self.abun_b.data = torch.from_numpy(logit(init_args['abun_b_init'])).float()
-        self.slope_a.data = torch.from_numpy(logit(init_args['slope_a_init'])).float()
-        self.slope_b.data = torch.from_numpy(logit(init_args['slope_b_init'])).float()
+        self.abun_a.data = torch.from_numpy(logit(init_args['abun_a_init'])).float().to(self.abun_a.device)
+        self.abun_b.data = torch.from_numpy(logit(init_args['abun_b_init'])).float().to(self.abun_b.device)
+        self.slope_a.data = torch.from_numpy(logit(init_args['slope_a_init'])).float().to(self.slope_a.device)
+        self.slope_b.data = torch.from_numpy(logit(init_args['slope_b_init'])).float().to(self.slope_b.device)
 
         return
 
@@ -292,7 +296,7 @@ class TimeAggAbun(nn.Module):
         self.wts = time_wts_unnorm
 
         # Normalize importance time weights
-        time_wts = (time_wts_unnorm).div(time_wts_unnorm.sum(dim=-1, keepdims=True) + 1e-8)
+        time_wts = (time_wts_unnorm).div(time_wts_unnorm.sum(dim=-1, keepdim=True) + 1e-8)
 
         if torch.isnan(time_wts).any():
             print(time_wts_unnorm.sum(-1))
@@ -309,8 +313,8 @@ class TimeAggAbun(nn.Module):
 
     def init_params(self, init_args):
         # # Initialize mu and sigma parameter
-        self.abun_a.data = torch.from_numpy(logit(init_args['abun_a_init'])).float()
-        self.abun_b.data = torch.from_numpy(logit(init_args['abun_b_init'])).float()
+        self.abun_a.data = torch.from_numpy(logit(init_args['abun_a_init'])).float().to(self.abun_a.device)
+        self.abun_b.data = torch.from_numpy(logit(init_args['abun_b_init'])).float().to(self.abun_b.device)
 
         return
 
@@ -338,7 +342,7 @@ class Threshold(nn.Module):
 
     def init_params(self, init_args):
         # Initialize the threshold parameter
-        self.thresh.data = torch.from_numpy(init_args['thresh_init']).float()
+        self.thresh.data = torch.from_numpy(init_args['thresh_init']).float().to(self.thresh.device)
 
         return
 
@@ -370,7 +374,7 @@ class Slope(nn.Module):
 
     def init_params(self, init_args):
         # Initialize the threshold parameter
-        self.slope.data = torch.from_numpy(init_args['slope_init']).float()
+        self.slope.data = torch.from_numpy(init_args['slope_init']).float().to(self.slope.device)
 
         return
 
@@ -406,7 +410,7 @@ class Rules(nn.Module):
         return x
 
     def init_params(self, init_args):
-        self.alpha.data = torch.from_numpy(init_args['alpha_init']).float()
+        self.alpha.data = torch.from_numpy(init_args['alpha_init']).float().to(self.alpha.device)
     
 
 class DenseLayer(nn.Module):
@@ -449,9 +453,9 @@ class DenseLayer(nn.Module):
         return x.squeeze(-1)
 
     def init_params(self, init_args):
-        self.weight.data = torch.from_numpy(init_args['w_init']).float()
-        self.bias.data = torch.from_numpy(init_args['bias_init']).float()
-        self.beta.data = torch.from_numpy(init_args['beta_init']).float()
+        self.weight.data = torch.from_numpy(init_args['w_init']).float().to(self.weight.device)
+        self.bias.data = torch.from_numpy(init_args['bias_init']).float().to(self.bias.device)
+        self.beta.data = torch.from_numpy(init_args['beta_init']).float().to(self.beta.device)
 
 
 class DenseLayerAbun(nn.Module):
@@ -494,9 +498,9 @@ class DenseLayerAbun(nn.Module):
         return x.squeeze(-1)
 
     def init_params(self, init_args):
-        self.weight.data = torch.from_numpy(init_args['w_init']).float()
-        self.bias.data = torch.from_numpy(init_args['bias_init']).float()
-        self.beta.data = torch.from_numpy(init_args['beta_init']).float()
+        self.weight.data = torch.from_numpy(init_args['w_init']).float().to(self.weight.device)
+        self.bias.data = torch.from_numpy(init_args['bias_init']).float().to(self.bias.device)
+        self.beta.data = torch.from_numpy(init_args['beta_init']).float().to(self.beta.device)
 
 
 class MDITRE(nn.Module):
@@ -526,7 +530,8 @@ class MDITRE(nn.Module):
 
     def init_params(self, init_args):
         for m in self.children():
-            m.init_params(init_args)
+            if hasattr(m, 'init_params') and callable(getattr(m, 'init_params', None)):
+                m.init_params(init_args)  # type: ignore[attr-defined]
 
         return
 
@@ -554,6 +559,7 @@ class MDITREAbun(nn.Module):
 
     def init_params(self, init_args):
         for m in self.children():
-            m.init_params(init_args)
+            if hasattr(m, 'init_params') and callable(getattr(m, 'init_params', None)):
+                m.init_params(init_args)  # type: ignore[attr-defined]
 
         return

@@ -6,7 +6,7 @@ Provides common interface for all layers to enable modularity and extensibility
 import torch
 import torch.nn as nn
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, Union
 
 
 class BaseLayer(nn.Module, ABC):
@@ -35,7 +35,7 @@ class BaseLayer(nn.Module, ABC):
         self._setup_complete = False
         
     @abstractmethod
-    def forward(self, *args, **kwargs):
+    def forward(self, *args, **kwargs) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
         """
         Forward pass through the layer
         
@@ -44,7 +44,7 @@ class BaseLayer(nn.Module, ABC):
             **kwargs: Additional layer-specific keyword arguments
             
         Returns:
-            Output tensor(s)
+            Output tensor(s) - can be a single Tensor or Tuple of Tensors
         """
         pass
     

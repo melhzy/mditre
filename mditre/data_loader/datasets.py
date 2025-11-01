@@ -7,7 +7,7 @@ Provides PyTorch Dataset classes for MDITRE training.
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, Union
 
 
 class TrajectoryDataset(Dataset):
@@ -48,18 +48,19 @@ class TrajectoryDataset(Dataset):
         """Return number of subjects"""
         return len(self.X)
     
-    def __getitem__(self, idx: int) -> Dict[str, Any]:
+    def __getitem__(self, idx: Union[int, torch.Tensor]) -> Dict[str, Any]:
         """
         Get a single subject's data.
         
         Args:
-            idx: Subject index
+            idx: Subject index (int or Tensor)
             
         Returns:
             Dictionary with 'data', 'label', and optionally 'mask'
         """
+        # Convert tensor index to int
         if torch.is_tensor(idx):
-            idx = idx.tolist()
+            idx = int(idx.item()) if idx.numel() == 1 else int(idx.tolist()[0])
         
         traj = self.X[idx]
         label = self.y[idx]
@@ -134,9 +135,13 @@ class TrajectoryDatasetWithMetadata(TrajectoryDataset):
         self.subject_ids = subject_ids
         self.covariates = covariates or {}
         
-    def __getitem__(self, idx: int) -> Dict[str, Any]:
+    def __getitem__(self, idx: Union[int, torch.Tensor]) -> Dict[str, Any]:
         """Get subject data with metadata"""
         sample = super().__getitem__(idx)
+        
+        # Ensure idx is int for indexing
+        if torch.is_tensor(idx):
+            idx = int(idx.item()) if idx.numel() == 1 else int(idx.tolist()[0])
         
         if self.times is not None:
             sample['times'] = self.times[idx]

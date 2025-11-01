@@ -42,6 +42,10 @@ class DADA2Loader(BaseDataLoader):
         """
         super().__init__(data_path, config)
         
+        # Ensure config is a dict
+        if config is None:
+            config = {}
+        
         # Set default file names
         self.abundance_file = config.get('abundance_file', 'abundance.csv')
         self.tax_file = config.get('tax_file', 'tax_table.csv')
@@ -211,6 +215,10 @@ class QIIME2Loader(BaseDataLoader):
     def __init__(self, data_path: str, config: Optional[Dict[str, Any]] = None):
         """Initialize QIIME2 loader"""
         super().__init__(data_path, config)
+        
+        # Ensure config is a dict
+        if config is None:
+            config = {}
         
         # QIIME2 default file names
         self.feature_table_file = config.get('feature_table_file', 'feature-table.csv')

@@ -118,14 +118,14 @@ class CustomMDITRE(nn.Module):
         """Initialize all layer parameters"""
         for module in self.children():
             if hasattr(module, 'init_params'):
-                module.init_params(init_args)
+                module.init_params(init_args)  # type: ignore[attr-defined]
     
     def get_layer_info(self):
         """Get information about all layers"""
         info = {}
         for name, module in self.named_children():
             if hasattr(module, 'get_layer_info'):
-                info[name] = module.get_layer_info()
+                info[name] = module.get_layer_info()  # type: ignore[attr-defined]
         return info
 
 

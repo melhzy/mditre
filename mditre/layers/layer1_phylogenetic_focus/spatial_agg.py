@@ -48,6 +48,7 @@ class SpatialAgg(BaseLayer):
         
         # Initialize phylogenetic distance matrix as a buffer (non-trainable)
         self.register_buffer('dist', torch.from_numpy(dist))
+        self.dist: torch.Tensor  # Type hint for static analyzer
         
         # OTU selection bandwidth
         # All OTUs within kappa radius are deemed to be selected
@@ -137,6 +138,7 @@ class SpatialAggDynamic(BaseLayer):
         
         # Register OTU embeddings as buffer
         self.register_buffer('dist', torch.from_numpy(otu_embeddings))
+        self.dist: torch.Tensor  # Type hint for static analyzer
         
         # Learnable OTU centers in embedding space
         self.eta = nn.Parameter(torch.Tensor(num_rules, num_otu_centers, emb_dim))

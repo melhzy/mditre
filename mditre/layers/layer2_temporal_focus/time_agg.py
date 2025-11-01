@@ -52,6 +52,7 @@ class TimeAgg(BaseLayer):
         # Tensor of time points, starting from 0 to num_time - 1
         self.num_time = num_time
         self.register_buffer('times', torch.arange(num_time, dtype=torch.float32))
+        self.times: torch.Tensor  # Type hint for static analyzer
         
         # Time window parameters (for abundance and slope)
         self.abun_a = nn.Parameter(torch.Tensor(num_rules, num_otus))
@@ -101,7 +102,7 @@ class TimeAgg(BaseLayer):
         
         # Normalize importance time weights
         time_wts = (time_wts_unnorm).div(
-            time_wts_unnorm.sum(dim=-1, keepdims=True) + 1e-8)
+            time_wts_unnorm.sum(dim=-1, keepdim=True) + 1e-8)
         
         if torch.isnan(time_wts).any():
             print(time_wts_unnorm.sum(-1))
@@ -219,7 +220,7 @@ class TimeAggAbun(BaseLayer):
         
         # Normalize importance time weights
         time_wts = (time_wts_unnorm).div(
-            time_wts_unnorm.sum(dim=-1, keepdims=True) + 1e-8)
+            time_wts_unnorm.sum(dim=-1, keepdim=True) + 1e-8)
         
         if torch.isnan(time_wts).any():
             print(time_wts_unnorm.sum(-1))
