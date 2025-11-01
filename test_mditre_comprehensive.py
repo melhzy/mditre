@@ -859,7 +859,7 @@ class TestSection12_1_PyTorchIntegration:
             emb_dim=test_config['emb_dim']
         ).to(device)
         
-        model_loaded.load_state_dict(torch.load(save_path))
+        model_loaded.load_state_dict(torch.load(save_path, weights_only=True))
         
         # Verify parameters match
         for p1, p2 in zip(model.parameters(), model_loaded.parameters()):

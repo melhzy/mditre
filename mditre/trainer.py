@@ -1952,6 +1952,11 @@ class Trainer(object):
                                     # fca.render('{}/r{}d{}_tree_ete3_abun_{}.pdf'.format(
                                     #     dirName, i, p, self.args.data_name),
                                     #     tree_style=ts)
+                                    
+                                    # Check if fca was found
+                                    if fca is None:
+                                        continue
+                                    
                                     fca_full_copy = deepcopy(fca)
                                     fca_copy = deepcopy(fca)
                                     
@@ -2996,9 +3001,13 @@ class Trainer(object):
                                     # fca.render('{}/r{}d{}_tree_ete3_abun_{}.pdf'.format(
                                     #     dirName, i, p, self.args.data_name),
                                     #     tree_style=ts)
-                                    # fca_full_copy = deepcopy(fca).up
                                     
-                                    # for n in fca.get_leaves():
+                                    # Check if fca was found (second instance)
+                                    if fca is None:
+                                        continue
+                                    
+                                    fca_full_copy = deepcopy(fca)
+                                    fca_copy = deepcopy(fca)
                                     #     if n.name in sel_otus:
                                     #         tw = textwrap.TextWrapper(width=30)
                                     #         if self.var_annot == {}:
