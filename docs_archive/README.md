@@ -19,7 +19,7 @@ For current documentation, please see:
 - **Main README**: `../README.md` - Comprehensive user guide
 - **Data Loader Specific**: `../mditre/data_loader/README.md` - Data loading API reference
 - **Examples**: `../mditre/examples/` - Working code examples
-- **Tutorials**: `../mditre/tutorials/` - Jupyter notebook tutorials
+- **Tutorials**: `../jupyter/tutorials/` - Jupyter notebook tutorials
 
 ## Purpose
 

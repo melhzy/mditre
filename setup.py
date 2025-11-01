@@ -19,7 +19,9 @@ setup(
                       'pandas',
                       'scipy',
                       'dendropy',
-                      'jupyterlab',                    
+                      'jupyterlab',
+                      'torch',  # Added for new modular architecture
+                      'seedhash @ git+https://github.com/melhzy/seedhash.git#subdirectory=Python',  # Deterministic seeding
                       ],
 
     classifiers=[

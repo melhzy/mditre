@@ -8,6 +8,7 @@ Main Components:
 - models: Original monolithic implementation (backward compatibility)
 - layers: New modular architecture (recommended for new projects)
 - core: Base classes and shared utilities
+- seeding: Deterministic seed generation for reproducibility
 
 Quick Start:
     # Using original models
@@ -25,6 +26,9 @@ Quick Start:
     
     # Using core utilities
     from mditre.core import BaseLayer, LayerRegistry
+    
+    # Using seeding for reproducibility
+    from mditre.seeding import MDITRESeedGenerator, get_mditre_seeds, set_random_seeds
 
 See MODULAR_ARCHITECTURE.md for detailed documentation.
 """
@@ -37,11 +41,13 @@ from .models import MDITRE, MDITREAbun
 # Expose modular layers for new projects
 from . import layers
 from . import core
+from . import seeding
 
 __all__ = [
     'MDITRE',
     'MDITREAbun',
     'layers',
     'core',
+    'seeding',
     '__version__',
 ]

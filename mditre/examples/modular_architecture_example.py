@@ -166,9 +166,9 @@ if __name__ == "__main__":
     print("MDITRE Modular Architecture Example")
     print("=" * 80)
     
-    # Set random seed
-    torch.manual_seed(42)
-    np.random.seed(42)
+    # Set random seed using MDITRE seeding module
+    from mditre.seeding import set_random_seeds
+    set_random_seeds(42)
     
     # Model parameters
     num_rules = 3

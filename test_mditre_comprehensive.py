@@ -71,8 +71,8 @@ def test_config():
 @pytest.fixture(scope="function")
 def synthetic_data(test_config):
     """Generate synthetic microbiome time-series data."""
-    np.random.seed(test_config['random_seed'])
-    torch.manual_seed(test_config['random_seed'])
+    from mditre.seeding import set_random_seeds
+    set_random_seeds(test_config['random_seed'])
     
     num_subjects = test_config['num_subjects']
     num_otus = test_config['num_otus']
@@ -101,7 +101,8 @@ def synthetic_data(test_config):
 @pytest.fixture(scope="function")
 def phylo_dist_matrix(test_config):
     """Generate phylogenetic distance matrix."""
-    np.random.seed(test_config['random_seed'])
+    from mditre.seeding import set_random_seeds
+    set_random_seeds(test_config['random_seed'])
     num_otus = test_config['num_otus']
     
     # Generate symmetric distance matrix
@@ -115,7 +116,8 @@ def phylo_dist_matrix(test_config):
 @pytest.fixture(scope="function")
 def otu_embeddings(test_config):
     """Generate OTU embeddings in phylogenetic space."""
-    np.random.seed(test_config['random_seed'])
+    from mditre.seeding import set_random_seeds
+    set_random_seeds(test_config['random_seed'])
     num_otus = test_config['num_otus']
     emb_dim = test_config['emb_dim']
     
@@ -126,7 +128,8 @@ def otu_embeddings(test_config):
 @pytest.fixture(scope="function")
 def init_args_full(test_config):
     """Generate initialization arguments for MDITRE model parameters."""
-    np.random.seed(test_config['random_seed'])
+    from mditre.seeding import set_random_seeds
+    set_random_seeds(test_config['random_seed'])
     
     num_rules = test_config['num_rules']
     num_otu_centers = test_config['num_otu_centers']  # Use otu_centers for internal layers

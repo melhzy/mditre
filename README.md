@@ -500,7 +500,7 @@ Combined Rule:
 ## 📖 Tutorials
 
 ### Tutorial 1: 16S rRNA Analysis
-**[Tutorial_Bokulich_16S_data.ipynb](mditre/tutorials/Tutorial_Bokulich_16S_data.ipynb)**
+**[Tutorial_Bokulich_16S_data.ipynb](jupyter/tutorials/Tutorial_Bokulich_16S_data.ipynb)**
 
 - Load 16S amplicon data (DADA2)
 - Build phylogenetic trees
@@ -510,14 +510,14 @@ Combined Rule:
 **Dataset:** Bokulich et al. infant gut microbiome (2016)
 
 ### Tutorial 2: Shotgun Metagenomics
-**[Tutorial_2_metaphlan_data.ipynb](mditre/tutorials/Tutorial_2_metaphlan_data.ipynb)**
+**[Tutorial_2_metaphlan_data.ipynb](jupyter/tutorials/Tutorial_2_metaphlan_data.ipynb)**
 
 - Work with MetaPhlAn profiles
 - Handle shotgun metagenomic data
 - Process taxonomic hierarchies
 
 ### Tutorial 3: Complete Workflow
-**[Tutorial_1_16s_data.ipynb](mditre/tutorials/Tutorial_1_16s_data.ipynb)**
+**[Tutorial_1_16s_data.ipynb](jupyter/tutorials/Tutorial_1_16s_data.ipynb)**
 
 - DADA2 sequence processing
 - Phylogenetic placement (pplacer)

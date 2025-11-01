@@ -575,6 +575,7 @@ class Trainer(object):
                 assigned_otus = list()
                 eta_init[i, j] = kmeans.cluster_centers_[j]
                 med_dist = list()
+                cur_assig_otu = 0  # Initialize to avoid unbound error
                 for k in range(self.num_otus):
                     if kmeans.labels_[k] == j:
                         med_dist.append(np.linalg.norm(kmeans.cluster_centers_[j] - self.dist_emb[k], axis=-1))
@@ -626,6 +627,12 @@ class Trainer(object):
         p_acc_num_samples_abun = np.array(acc_num_samples_abun) / sum(acc_num_samples_abun)
         N_cur = min(3, len(acc_center_abun))
 
+        # Initialize slope-related variables to avoid unbound errors
+        acc_center_slope = list()
+        acc_len_slope = list()
+        acc_num_samples_slope = list()
+        p_acc_num_samples_slope = np.array([1.0])  # Default value
+        
         if not self.args.use_abun:
             window_len_slope = None
             acc_center_slope = list()
@@ -659,11 +666,16 @@ class Trainer(object):
             p=p_acc_num_samples_abun)
         mu_init = np.zeros((self.num_rules, self.num_detectors), dtype=np.float32)
         sigma_init = np.zeros((self.num_rules, self.num_detectors), dtype=np.float32)
+        
+        # Initialize slope-related variables to avoid unbound errors
+        mu_slope_init = np.zeros((self.num_rules, self.num_detectors), dtype=np.float32)
+        sigma_slope_init = np.zeros((self.num_rules, self.num_detectors), dtype=np.float32)
+        mu_slope_idx = np.zeros((self.num_rules, self.num_detectors), dtype=np.int32)
+        
         if not self.args.use_abun:
             mu_slope_idx = np.random.choice(np.arange(len(acc_center_slope)), (self.num_rules, self.num_detectors),
                 p=p_acc_num_samples_slope)
-            mu_slope_init = np.zeros((self.num_rules, self.num_detectors), dtype=np.float32)
-            sigma_slope_init = np.zeros((self.num_rules, self.num_detectors), dtype=np.float32)
+        
         for l in range(self.num_rules):
             for m in range(self.num_detectors):
                 mu_init[l, m] = acc_center_abun[mu_idx[l, m]]
@@ -761,8 +773,7 @@ class Trainer(object):
 
                     # Init time windows
                     thresh_init = np.zeros((self.num_rules, self.num_detectors), dtype=np.float32)
-                    if not self.args.use_abun:
-                        slope_init = np.zeros((self.num_rules, self.num_detectors), dtype=np.float32)
+                    slope_init = np.zeros((self.num_rules, self.num_detectors), dtype=np.float32)
                     thresh_mean = list()
                     slope_mean = list()
 
@@ -854,6 +865,10 @@ class Trainer(object):
                     abun_b_init = (mu_init - (self.num_time * abun_a_init / 2.)) / ((1 - abun_a_init) * self.num_time)
                     abun_b_init = np.clip(abun_b_init, 1e-2, 1 - 1e-2)
 
+                    # Initialize slope variables to avoid unbound errors
+                    slope_a_init = np.zeros_like(sigma_slope_init)
+                    slope_b_init = np.zeros_like(mu_slope_init)
+                    
                     if not self.args.use_abun:
                         slope_a_init = sigma_slope_init / self.num_time
                         slope_a_init = np.clip(slope_a_init, 1e-2, 1 - 1e-2)
@@ -967,25 +982,27 @@ class Trainer(object):
 
                     k_fold_test_f1[i] = f1_score(true, (np.array(probs) > 0.5).astype(np.float32))
 
-                    self.eval_with_preds(best_model, full_loader)
-                    self.sub_log_odds = best_model.fc.sub_log_odds.detach().cpu().numpy()
-                    self.subjects_log_odds = best_model.fc.log_odds.detach().cpu().numpy()
-                    self.sub_0_log_odds = list()
-                    self.sub_1_log_odds = list()
-                    self.subjects_0_log_odds = list()
-                    self.subjects_1_log_odds = list()
-                    for jj in range(self.num_subjects):
-                        if self.y[jj]:
-                            self.sub_1_log_odds.append(self.sub_log_odds[jj, :])
-                            self.subjects_1_log_odds.append(self.subjects_log_odds[jj])
-                        else:
-                            self.sub_0_log_odds.append(self.sub_log_odds[jj, :])
-                            self.subjects_0_log_odds.append(self.subjects_log_odds[jj])
+                    # Only access best_model if it's not None
+                    if best_model is not None:
+                        self.eval_with_preds(best_model, full_loader)
+                        self.sub_log_odds = best_model.fc.sub_log_odds.detach().cpu().numpy()
+                        self.subjects_log_odds = best_model.fc.log_odds.detach().cpu().numpy()
+                        self.sub_0_log_odds = list()
+                        self.sub_1_log_odds = list()
+                        self.subjects_0_log_odds = list()
+                        self.subjects_1_log_odds = list()
+                        for jj in range(self.num_subjects):
+                            if self.y[jj]:
+                                self.sub_1_log_odds.append(self.sub_log_odds[jj, :])
+                                self.subjects_1_log_odds.append(self.subjects_log_odds[jj])
+                            else:
+                                self.sub_0_log_odds.append(self.sub_log_odds[jj, :])
+                                self.subjects_0_log_odds.append(self.subjects_log_odds[jj])
 
-                    if not self.args.rank:
-                        for k, v in best_model.named_parameters():
-                            self.logger.info(k)
-                            self.logger.info(v)
+                        if not self.args.rank:
+                            for k, v in best_model.named_parameters():
+                                self.logger.info(k)
+                                self.logger.info(v)
 
                     if not self.args.use_abun:
                         self.show_rules(best_model, full_loader, i, save_viz=True, best_model_init=None)
@@ -1040,6 +1057,7 @@ class Trainer(object):
     def train_model(self, model, train_loader, val_loader, test_loader, outer_fold):
         best_val_loss = np.inf
         best_val_f1 = 0.
+        best_model = None  # Initialize to avoid unbound error
 
         # Init optimizer and lr scheduler
         if not self.args.use_abun:
@@ -1072,6 +1090,8 @@ class Trainer(object):
         dirName = '{}/fold_{}'.format(self.log_dir, outer_fold)
         self.create_dir(dirName)
 
+        # Initialize losses_csv to avoid unbound errors
+        losses_csv = None
         if self.args.save_as_csv:
             column_names = ['Epoch', 'Total loss', 'Train CE loss', 'Val CE loss', 'Test CE loss', 'NegBin rule loss', 'NegBin detector loss',\
             'L2 weights loss', 'Time window abundance loss', 'Time window slope loss']
@@ -1100,6 +1120,10 @@ class Trainer(object):
             train_loss_avg = AverageMeter()
             val_loss_avg = AverageMeter()
             train_f1_avg = AverageMeter()
+            
+            # Initialize variables to avoid unbound errors in CSV logging
+            loss = torch.tensor(0.0, device=self.device)
+            train_loss = torch.tensor(0.0, device=self.device)
 
             # Compute temperature for binary concrete
             # Linearly anneal from t_max to t_min every epoch
@@ -1124,6 +1148,12 @@ class Trainer(object):
 
             # Switch model to train mode
             model.train()
+            
+            # Initialize variables before batch loop to avoid unbound errors
+            negbin_zr_loss = torch.tensor(0.0, device=self.device)
+            negbin_z_loss = torch.tensor(0.0, device=self.device)
+            l2_wts_loss = torch.tensor(0.0, device=self.device)
+            time_loss = torch.tensor(0.0, device=self.device)
 
             # Mini-batch training loop
             for i, batch in enumerate(train_loader):
@@ -1153,8 +1183,14 @@ class Trainer(object):
                 # Priors / regularizers
                 rules = model.fc.z
                 detectors = model.rules.z
-                if not self.args.use_abun:
-                    detectors_slope = model.rules_slope.z
+                
+                # Initialize slope-related variables to avoid unbound errors
+                detectors_slope = torch.zeros_like(detectors) if self.args.use_abun else model.rules_slope.z
+                time_slope_loss = torch.tensor(0.0, device=self.device)
+                time_slope_a_normal_loss = torch.tensor(0.0, device=self.device)
+                time_slope_b_normal_loss = torch.tensor(0.0, device=self.device)
+                det_slope_bc_loss = torch.tensor(0.0, device=self.device)
+                
                 negbin_zr_loss = self.negbin_loss(rules.sum(), self.z_r_mean, self.z_r_var)
                 if not self.args.use_abun:
                     negbin_z_loss = self.negbin_loss(detectors.sum(dim=-1) + detectors_slope.sum(dim=-1),
@@ -1164,18 +1200,19 @@ class Trainer(object):
                         self.z_mean, self.z_var).sum()
                 l2_wts_loss = -self.normal_wts.log_prob(model.fc.weight).sum()
                 time_wts_abun = model.time_attn.wts.sum(dim=-1)
+                time_loss = -(torch.sigmoid((time_wts_abun - 1.) * 10).prod(dim=0)).sum()
+                
                 if not self.args.use_abun:
                     time_wts_slope = model.time_attn.wts_slope.sum(dim=-1)
-                time_loss = -(torch.sigmoid((time_wts_abun - 1.) * 10).prod(dim=0)).sum()
-                if not self.args.use_abun:
                     time_slope_loss = -(torch.sigmoid((time_wts_slope - 2.) * 10).prod(dim=0)).sum()
                 emb_normal_loss = -self.normal_emb.log_prob(model.spat_attn.eta).sum()
                 time_abun_a_normal_loss = -self.normal_time_abun_a.log_prob(model.time_attn.abun_a).sum()
+                time_abun_b_normal_loss = -self.normal_time_abun_b.log_prob(model.time_attn.abun_b).sum()
+                
                 if not self.args.use_abun:
                     time_slope_a_normal_loss = -self.normal_time_slope_a.log_prob(model.time_attn.slope_a).sum()
-                time_abun_b_normal_loss = -self.normal_time_abun_b.log_prob(model.time_attn.abun_b).sum()
-                if not self.args.use_abun:
                     time_slope_b_normal_loss = -self.normal_time_slope_b.log_prob(model.time_attn.slope_b).sum()
+                
                 rule_normal_loss = -self.normal_rule.log_prob(model.fc.beta).sum()
                 if not self.args.use_abun:
                     det_normal_loss = -(self.normal_det.log_prob(model.rules.alpha).sum() + \
@@ -1186,6 +1223,7 @@ class Trainer(object):
                 
                 rule_bc_loss = self.binary_concrete_loss(1/k_beta, 1, rules + 1e-5).sum()
                 det_abun_bc_loss = self.binary_concrete_loss(1/k_alpha, 1, detectors + 1e-5).sum()
+                
                 if not self.args.use_abun:
                     det_slope_bc_loss = self.binary_concrete_loss(1/k_alpha, 1, detectors_slope + 1e-5).sum()
 
@@ -1255,7 +1293,7 @@ class Trainer(object):
             # rnls.append(rule_normal_loss.item())
             # dnls.append(det_normal_loss.item())
 
-            if self.args.save_as_csv:
+            if self.args.save_as_csv and losses_csv is not None:
                 losses_csv.loc[len(losses_csv.index)] = [epoch, loss.item(), train_loss.item(),\
                 val_loss, test_loss, negbin_zr_loss.item(),\
                 negbin_z_loss.item(), l2_wts_loss.item(), time_loss.item(), time_slope_loss.item()]
@@ -1279,7 +1317,7 @@ class Trainer(object):
             scheduler_0.step()
 
 
-        if self.args.save_as_csv:
+        if self.args.save_as_csv and losses_csv is not None:
             losses_csv.to_csv('{}/losses_dump.csv'.format(dirName), index=False)
 
         return best_model
@@ -1289,6 +1327,10 @@ class Trainer(object):
         val_preds = list()
         val_true = list()
         val_loss_avg = AverageMeter()
+        
+        # Initialize to avoid unbound errors
+        labels = None
+        outputs = None
 
         # Evaluate model on val data
         model.eval()
@@ -1316,8 +1358,10 @@ class Trainer(object):
 
         if len(val_true) > 1:
             val_f1 = f1_score(val_true, val_preds)
-        else:
+        elif labels is not None and outputs is not None:
             val_f1 = float(labels.detach().cpu().numpy() == (outputs.sigmoid().detach().cpu().numpy() > 0.5))
+        else:
+            val_f1 = 0.0
 
         return val_loss_avg.avg, val_f1
 
@@ -1378,8 +1422,11 @@ class Trainer(object):
             loss_1 = (temp + 1) * (torch.log(x * (1 - x) + 1e-5))
             loss_2 = 2 * (torch.log((alpha / ((x ** temp) + 1e-5)) + (1 / ((1 - x) ** temp) + 1e-5) + 1e-5))
         except Exception as e:
-            print(loss_1, loss_2)
-            print(x)
+            # Initialize variables before print to avoid unbound errors
+            loss_1 = torch.tensor(0.0)
+            loss_2 = torch.tensor(0.0)
+            print(f"Binary concrete loss error: loss_1={loss_1}, loss_2={loss_2}")
+            print(f"x={x}")
             raise e
         
         return loss_1 + loss_2
@@ -1395,14 +1442,11 @@ class Trainer(object):
         if seed is None:
             seed = int(time.time())
 
-        if self.use_gpu:
-            cudnn.benchmark = False
-            cudnn.deterministic = True
-            torch.cuda.manual_seed(seed)
-            torch.cuda.manual_seed_all(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        random.seed(seed)
+        # Use MDITRE seeding module for consistent seed management
+        from mditre.seeding import set_random_seeds
+        set_random_seeds(seed)
+        
+        # Additional environment configuration
         os.environ['PYTHONHASHSEED'] = str(seed)
 
         self.seed = seed
@@ -1587,17 +1631,20 @@ class Trainer(object):
         # ax0.axvline(win_end_idx + 1, linewidth=8, alpha=0.7, color='black')
         ax0.add_patch(Rectangle((win_start_idx, 0), win_end_idx - win_start_idx + 1, x_0.shape[0],
             alpha=0.7, fill=False, edgecolor='k', lw=6))
-        ax0.text(ax2.get_xticks()[win_start_idx], -.05, str(t_min), color='black', transform=ax0.get_xaxis_transform(),
+        
+        # Get x tick positions as array and index properly
+        ax2_xticks = ax2.get_xticks()
+        ax0.text(float(ax2_xticks[win_start_idx]), -.05, str(t_min), color='black', transform=ax0.get_xaxis_transform(),
             ha='center', va='top', fontsize=20)
-        ax0.text(ax2.get_xticks()[win_end_idx], -.05, str(t_max), color='black', transform=ax0.get_xaxis_transform(),
+        ax0.text(float(ax2_xticks[win_end_idx]), -.05, str(t_max), color='black', transform=ax0.get_xaxis_transform(),
             ha='center', va='top', fontsize=20)
         # ax2.axvline(win_start_idx, linewidth=8, alpha=0.7, color='black')
         # ax2.axvline(win_end_idx + 1, linewidth=8, alpha=0.7, color='black')
         ax2.add_patch(Rectangle((win_start_idx, 0), win_end_idx - win_start_idx + 1, x_0.shape[0],
             alpha=0.7, fill=False, edgecolor='k', lw=6))
-        ax2.text(ax2.get_xticks()[win_start_idx], -.05, str(t_min), color='black', transform=ax2.get_xaxis_transform(),
+        ax2.text(float(ax2_xticks[win_start_idx]), -.05, str(t_min), color='black', transform=ax2.get_xaxis_transform(),
             ha='center', va='top', fontsize=20)
-        ax2.text(ax2.get_xticks()[win_end_idx], -.05, str(t_max), color='black', transform=ax2.get_xaxis_transform(),
+        ax2.text(float(ax2_xticks[win_end_idx]), -.05, str(t_max), color='black', transform=ax2.get_xaxis_transform(),
             ha='center', va='top', fontsize=20)
         # ax0.text(x=win_mid, y=-0.2, s='Selected time window',
         #         horizontalalignment='center', fontsize=12)
@@ -1677,6 +1724,14 @@ class Trainer(object):
             'time_window_high', 'abundance_threshold', 'slope_threshold', 'median_thresh_0', 'median_thresh_1', 'weight', 'bias']
             csv_df = pd.DataFrame(columns=column_names)
 
+        # Initialize variables to avoid unbound errors
+        x_spat = None
+        x_time = None
+        x_thresh = None
+        mask = None
+        labels = None
+        outputs = None
+        
         if save_viz:
             best_model.eval()
             with torch.no_grad():
@@ -1691,8 +1746,20 @@ class Trainer(object):
                     x = best_model.rules(x_thresh, k=self.args.max_k_bc, hard=False)
                     outputs = best_model.fc(x, k=self.args.max_k_bc, hard=False)
 
-            x_spat = x_spat.detach().cpu().numpy()
-            x_time = x_time.detach().cpu().numpy()
+            if x_spat is not None:
+                x_spat = x_spat.detach().cpu().numpy()
+            if x_time is not None:
+                x_time = x_time.detach().cpu().numpy()
+            if x_thresh is not None:
+                x_thresh = x_thresh.detach().cpu().numpy()
+            if mask is not None:
+                mask = mask.detach().cpu().numpy()
+            if labels is not None:
+                labels = labels.detach().cpu().numpy()
+            if outputs is not None:
+                model_prob = torch.sigmoid(outputs).detach().cpu().numpy()
+            else:
+                model_prob = None
             otu_wts = best_model.spat_attn.wts.detach().cpu().numpy()
             time_mu = (best_model.time_attn.m).detach().cpu().numpy()
             time_sigma = (best_model.time_attn.s_abun).detach().cpu().numpy()
@@ -1702,15 +1769,11 @@ class Trainer(object):
             threshs = best_model.thresh_func.thresh.detach().cpu().numpy()
             # threshs = x_time.mean(axis=0)
             # slopes = x_time_slope.mean(axis=0)
-            labels = labels.detach().cpu().numpy()
             fc_wts = best_model.fc.weight.view(-1).detach().cpu().numpy()
             fc_bias = best_model.fc.bias.detach().cpu().item()
             kappas = (best_model.spat_attn.kappas).detach().cpu().numpy()
             etas = (best_model.spat_attn.eta).detach().cpu().numpy()
             dist_emb = (best_model.spat_attn.emb_dist).detach().cpu().numpy()
-            x_thresh = x_thresh.detach().cpu().numpy()
-            mask = mask.detach().cpu().numpy()
-            model_prob = torch.sigmoid(outputs).detach().cpu().numpy()
             rule_log_odds = fc_wts * rules + fc_bias
 
             rules_dict = {
@@ -2689,6 +2752,16 @@ class Trainer(object):
             'time_window_high', 'abundance_threshold', 'slope_threshold', 'median_thresh_0', 'median_thresh_1', 'weight', 'bias']
             csv_df = pd.DataFrame(columns=column_names)
 
+        # Initialize variables to avoid unbound errors
+        x_spat = None
+        x_time = None
+        x_time_slope = None
+        x_thresh = None
+        x_slope = None
+        mask = None
+        labels = None
+        outputs = None
+        
         if save_viz:
             best_model.eval()
             with torch.no_grad():
@@ -2705,9 +2778,20 @@ class Trainer(object):
                     x_s = best_model.rules(x_slope, k=self.args.max_k_bc, hard=False)
                     outputs = best_model.fc(x, x_s, k=self.args.max_k_bc, hard=False)
 
-            x_spat = x_spat.detach().cpu().numpy()
-            x_time = x_time.detach().cpu().numpy()
-            x_time_slope = x_time_slope.detach().cpu().numpy()
+            if x_spat is not None:
+                x_spat = x_spat.detach().cpu().numpy()
+            if x_time is not None:
+                x_time = x_time.detach().cpu().numpy()
+            if x_time_slope is not None:
+                x_time_slope = x_time_slope.detach().cpu().numpy()
+            if x_thresh is not None:
+                x_thresh = x_thresh.detach().cpu().numpy()
+            if x_slope is not None:
+                x_slope = x_slope.detach().cpu().numpy()
+            if mask is not None:
+                mask = mask.detach().cpu().numpy()
+            if labels is not None:
+                labels = labels.detach().cpu().numpy()
             otu_wts = best_model.spat_attn.wts.detach().cpu().numpy()
             time_mu = (best_model.time_attn.m).detach().cpu().numpy()
             time_mu_slope = (best_model.time_attn.m_slope).detach().cpu().numpy()
@@ -2722,7 +2806,6 @@ class Trainer(object):
             slopes = best_model.slope_func.slope.detach().cpu().numpy()
             # threshs = x_time.mean(axis=0)
             # slopes = x_time_slope.mean(axis=0)
-            labels = labels.detach().cpu().numpy()
             fc_wts = best_model.fc.weight.view(-1).detach().cpu().numpy()
             fc_bias = best_model.fc.bias.detach().cpu().item()
             kappas = (best_model.spat_attn.kappas).detach().cpu().numpy()
