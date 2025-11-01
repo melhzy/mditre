@@ -1,5 +1,15 @@
 import pickle, warnings, json, itertools, re, copy
 
+# DEPRECATION WARNING: This module is deprecated
+warnings.warn(
+    "mditre.data is deprecated and will be removed in v2.0. "
+    "Please use mditre.data_loader instead:\n"
+    "  from mditre.data_loader import AmpliconLoader, MetaphlanLoader, PickleLoader\n"
+    "See DATA_LOADER_GUIDE.md for migration instructions.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
 try:
     import configparser as ConfigParser
 except:

@@ -1,8 +1,9 @@
 # MDITRE: Microbiome Dynamics using Interpretable Temporal Rules
 
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-1.7+-red.svg)](https://pytorch.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
 
 **MDITRE** (Microbiome DynamIc Time-series Rule Extraction) is a scalable and interpretable machine learning framework for predicting host status from temporal microbiome dynamics. The model learns human-readable rules that combine phylogenetic relationships and temporal patterns in longitudinal microbiome data.
 
@@ -14,7 +15,8 @@
 - 🔧 **Modular Architecture**: Extensible 5-layer design for easy customization
 - 📊 **Multiple Data Formats**: Support for 16S rRNA, shotgun metagenomics (DADA2, QIIME2, Metaphlan)
 - 🎨 **Visualization GUI**: Interactive exploration of learned rules and patterns
-- 🚀 **Production Ready**: Fully validated with comprehensive test coverage
+- � **Reproducibility**: Deterministic seeding system for consistent results
+- �🚀 **Production Ready**: v1.0.0 with comprehensive test coverage and modern infrastructure
 
 ## 📚 Table of Contents
 
@@ -24,9 +26,11 @@
 - [Data Loading](#data-loading)
 - [Training Models](#training-models)
 - [Interpreting Results](#interpreting-results)
+- [Development](#development)
 - [Tutorials](#tutorials)
 - [Advanced Usage](#advanced-usage)
 - [Citation](#citation)
+- [Contributing](#contributing)
 
 ---
 
@@ -35,10 +39,27 @@
 ### Requirements
 
 - Python 3.8+ (tested with 3.8-3.12)
-- PyTorch 1.7+ (tested with 2.6+)
+- PyTorch 2.0+ (tested with 2.5.1)
 - CUDA 11.0+ for GPU support (optional but recommended)
 
-### Quick Install
+### Quick Install (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/melhzy/mditre.git
+cd mditre
+
+# Install with pip (includes all dependencies)
+pip install -e .
+
+# For development (includes testing, formatting, type checking tools)
+pip install -r requirements-dev.txt
+
+# Or use Makefile:
+make install-dev
+```
+
+### Platform-Specific Instructions
 
 #### Ubuntu 24.04 / Linux
 
@@ -48,15 +69,12 @@
 python3 -m venv mditre_env
 source mditre_env/bin/activate
 
-# Install PyTorch with CUDA
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+# Install MDITRE with pinned dependencies
+pip install -r requirements.txt
+pip install -e .
 
-# Install MDITRE and dependencies
-pip install scikit-learn matplotlib seaborn pandas scipy dendropy ete3 ipykernel PyQt5
-
-# Install from source
-git clone https://github.com/gerberlab/mditre.git
-cd mditre
+# Or install PyTorch separately then MDITRE
+pip install torch --index-url https://download.pytorch.org/whl/cu124
 pip install -e .
 ```
 
@@ -64,10 +82,7 @@ pip install -e .
 ```bash
 python3 -m venv mditre_env
 source mditre_env/bin/activate
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-pip install scikit-learn matplotlib seaborn pandas scipy dendropy ete3 ipykernel PyQt5
-git clone https://github.com/gerberlab/mditre.git
-cd mditre
+pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install -e .
 ```
 
@@ -75,12 +90,16 @@ pip install -e .
 
 **With GPU Support**
 ```powershell
+# Using conda (recommended for Windows)
 conda create -n mditre python=3.12 -y
 conda activate mditre
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
-pip install scikit-learn matplotlib seaborn pandas scipy dendropy ete3 ipykernel PyQt5
-git clone https://github.com/gerberlab/mditre.git
-cd mditre
+
+# Install MDITRE
+pip install -r requirements.txt
+pip install -e .
+
+# Or with CUDA-specific PyTorch
+pip install torch --index-url https://download.pytorch.org/whl/cu124
 pip install -e .
 ```
 
@@ -89,10 +108,9 @@ pip install -e .
 ```bash
 python3 -m venv mditre_env
 source mditre_env/bin/activate
-pip install torch torchvision torchaudio  # Optimized for Apple Silicon
-pip install scikit-learn matplotlib seaborn pandas scipy dendropy ete3 ipykernel PyQt5
-git clone https://github.com/gerberlab/mditre.git
-cd mditre
+
+# PyTorch optimized for Apple Silicon
+pip install -r requirements.txt
 pip install -e .
 ```
 
@@ -707,12 +725,167 @@ tree_file = "tree.nwk"
 
 ---
 
-## 🤝 Getting Help
+## 🛠️ Development
 
-- **Issues**: [GitHub Issues](https://github.com/gerberlab/mditre/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/gerberlab/mditre/discussions)
-- **Documentation**: `mditre/docs/`
-- **Examples**: `mditre/examples/` and `mditre/tutorials/`
+### For Contributors
+
+MDITRE v1.0.0 includes modern development infrastructure for easy contribution.
+
+#### Quick Development Setup
+
+```bash
+# Clone and setup
+git clone https://github.com/melhzy/mditre.git
+cd mditre
+
+# Install development dependencies
+make install-dev
+# Or: pip install -r requirements-dev.txt
+
+# Run tests
+make test
+
+# Format code
+make format
+
+# Check code quality
+make quality
+```
+
+#### Development Commands
+
+| Command | Description |
+|---------|-------------|
+| `make install` | Install package in editable mode |
+| `make install-dev` | Install with development tools |
+| `make test` | Run all tests (pytest) |
+| `make test-cov` | Run tests with coverage report |
+| `make test-fast` | Skip slow tests |
+| `make format` | Format code (black + isort) |
+| `make lint` | Check code style (flake8) |
+| `make typecheck` | Run type checker (mypy) |
+| `make quality` | Run all quality checks |
+| `make dev` | Quick dev cycle (format + fast test) |
+| `make ci` | Full CI simulation |
+| `make clean` | Remove build artifacts |
+
+#### Running Tests
+
+```bash
+# All tests
+pytest tests/ -v
+
+# Specific test file
+pytest tests/test_mditre_comprehensive.py -v
+
+# With coverage
+pytest tests/ --cov=mditre --cov-report=html
+
+# By marker
+pytest tests/ -m architecture
+pytest tests/ -m "not slow"
+
+# Latest: 28/28 passing in 2.17s ✅
+```
+
+#### Project Structure
+
+```
+mditre/
+├── .gitignore              # Version control config
+├── pyproject.toml          # Modern packaging (PEP 518)
+├── requirements.txt        # Pinned dependencies
+├── requirements-dev.txt    # Development tools
+├── Makefile                # Task automation
+├── CHANGELOG.md            # Version history
+├── CONTRIBUTING.md         # Contribution guidelines
+├── tests/                  # Test suite
+│   ├── conftest.py         # Shared fixtures
+│   ├── test_*.py           # Test files
+│   └── README.md           # Test documentation
+├── mditre/                 # Package source
+└── docs/                   # Documentation
+```
+
+#### Code Style
+
+- **Formatter**: Black (100 char line length)
+- **Import Sort**: isort (black profile)
+- **Linter**: Flake8
+- **Type Checker**: mypy
+- **All configured in**: `pyproject.toml`
+
+#### Quality Standards
+
+- ✅ All tests must pass
+- ✅ Code coverage >80%
+- ✅ Black formatted
+- ✅ No linting errors
+- ✅ Type hints for public APIs
+- ✅ Docstrings (Google style)
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
+
+- 🚀 Getting started guide
+- 📋 Contribution workflow
+- ✅ Code quality standards
+- 📝 Documentation guidelines
+- 🐛 Bug report templates
+- ✨ Feature request process
+
+### Quick Contribution Guide
+
+1. **Fork** the repository
+2. **Create** a feature branch
+3. **Make** your changes
+4. **Test**: `make test`
+5. **Format**: `make format`
+6. **Quality Check**: `make quality`
+7. **Commit** with clear message
+8. **Push** and create Pull Request
+
+### Areas for Contribution
+
+- 🐛 Bug fixes
+- ✨ New features (layers, loaders, transforms)
+- 📝 Documentation improvements
+- 🧪 Additional tests
+- 🎨 Visualization enhancements
+- 📊 Example notebooks
+
+---
+
+## 📖 Documentation
+
+### Core Documentation
+- **[README.md](README.md)** - This file: Installation, usage, quick start
+- **[QA.md](QA.md)** - Quality assurance and test status
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
+
+### Technical Documentation (`docs/`)
+- **[docs/README.md](docs/README.md)** - Documentation index and navigation
+- **[docs/MODULAR_ARCHITECTURE.md](docs/MODULAR_ARCHITECTURE.md)** - 5-layer architecture reference
+- **[docs/DATA_LOADER_GUIDE.md](docs/DATA_LOADER_GUIDE.md)** - Data loading system API
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** - Development guide & performance
+- **[docs/SEEDING_GUIDE.md](docs/SEEDING_GUIDE.md)** - Reproducibility & seeding
+- **[docs/TRAINER_FIXES.md](docs/TRAINER_FIXES.md)** - Bug fixes documentation
+
+### Examples & Tutorials
+- **Examples**: `mditre/examples/` - Working code examples
+- **Tutorials**: `jupyter/` - Jupyter notebooks with step-by-step guides
+- **Quick Test**: `jupyter/run_mditre_test.ipynb` - Fast training demo
+
+### Getting Help
+- **Issues**: [GitHub Issues](https://github.com/melhzy/mditre/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/melhzy/mditre/discussions)
+- **Tests**: `tests/` - Comprehensive test suite documentation
 
 ---
 
@@ -740,16 +913,16 @@ If you use MDITRE, please cite:
 
 ## 📜 License
 
-MIT License - see [LICENSE](LICENSE) file
+GNU General Public License v3.0 (GPL-3.0) - see [LICENSE](LICENSE) file
 
 ---
 
 ## 👥 Contributors
 
-- **Veda Sheersh Maringanti** - Original implementation
-- **Georg K. Gerber** - Principal Investigator
+- **Venkata Suhas Maringanti** - Original implementation
+- **Georg K. Gerber** - Principal Investigator  
 - **Vanni Bucci** - Co-Principal Investigator
-- **Ziyuan Huang** - Code and Architecture Improvements with QA
+- **Ziyuan Huang** - Maintainer, v1.0.0 infrastructure improvements
 
 ---
 
@@ -761,9 +934,19 @@ We thank the microbiome research community for public data and the developers of
 
 ## 📌 Version History
 
-- **v2.0.0** (2024): Modular architecture with extensible data loading
-- **v1.0.0** (2022): Initial public release
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
+
+- **v1.0.0** (November 2025): Production release with modern infrastructure
+  - Modular 5-layer architecture
+  - Extensible data loading system
+  - Deterministic seeding module
+  - Comprehensive test suite (28 tests, 100% passing)
+  - Modern development tools (pyproject.toml, Makefile, requirements.txt)
+  - Documentation reorganization (9 docs → 6 focused guides)
+  - Deprecation warnings for legacy code
+  - Task automation with 20+ Makefile commands
+- **v0.1.6** (2022): Initial beta release
 
 ---
 
-**🎉 MDITRE is production-ready and fully validated for microbiome time-series analysis!**
+**🎉 MDITRE v1.0.0 is production-ready with modern development infrastructure!**

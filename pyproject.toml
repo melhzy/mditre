@@ -1,0 +1,179 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mditre"
+version = "1.0.0"
+description = "MDITRE: Scalable and Interpretable Machine Learning for Predicting Host Status from Temporal Microbiome Dynamics"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "GPL-3.0"}
+authors = [
+    {name = "Venkata Suhas Maringanti", email = "vsuhas.m@gmail.com"}
+]
+maintainers = [
+    {name = "melhzy"}
+]
+keywords = [
+    "microbiome",
+    "machine-learning",
+    "interpretability",
+    "temporal-analysis",
+    "rule-extraction",
+    "phylogenetic-analysis",
+    "deep-learning",
+    "bioinformatics"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "numpy>=1.20.0",
+    "torch>=2.0.0",
+    "scikit-learn>=0.24.0",
+    "matplotlib>=3.3.0",
+    "seaborn>=0.11.0",
+    "pandas>=1.2.0",
+    "scipy>=1.6.0",
+    "ete3>=3.1.2",
+    "dendropy>=4.5.0",
+    "seedhash @ git+https://github.com/melhzy/seedhash.git#subdirectory=Python"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=3.0.0",
+    "black>=22.0.0",
+    "flake8>=4.0.0",
+    "mypy>=0.950",
+    "jupyterlab>=3.0.0",
+    "ipykernel>=6.0.0"
+]
+viz = [
+    "PyQt5>=5.15.0"
+]
+docs = [
+    "sphinx>=4.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "myst-parser>=0.18.0"
+]
+all = [
+    "mditre[dev,viz,docs]"
+]
+
+[project.urls]
+Documentation = "https://github.com/melhzy/mditre/blob/master/README.md"
+Source = "https://github.com/melhzy/mditre"
+"Bug Reports" = "https://github.com/melhzy/mditre/issues"
+Homepage = "https://github.com/melhzy/mditre"
+
+[tool.setuptools]
+packages = ["mditre"]
+
+[tool.setuptools.package-data]
+mditre = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | jupyter/tutorials/datasets
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+skip_gitignore = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+markers = [
+    "architecture: Tests for model architecture components",
+    "layer1: Tests for Layer 1 (Phylogenetic Focus)",
+    "layer2: Tests for Layer 2 (Temporal Focus)",
+    "layer3: Tests for Layer 3 (Detectors)",
+    "layer4: Tests for Layer 4 (Rules)",
+    "layer5: Tests for Layer 5 (Classification)",
+    "differentiability: Tests for gradient flow and differentiability",
+    "critical: Critical tests that must pass",
+    "model: Tests for complete models (MDITRE/MDITREAbun)",
+    "metrics: Tests for performance metrics computation",
+    "integration: Integration tests for full workflows",
+    "gpu: Tests that require GPU/CUDA",
+    "slow: Slow-running tests",
+    "phylogenetic: Tests for phylogenetic focus mechanisms",
+    "temporal: Tests for temporal focus mechanisms",
+    "interpretability: Tests for interpretability features",
+    "data: Tests for data processing and loading",
+    "performance: Tests for performance benchmarking",
+    "scalability: Tests for scalability analysis"
+]
+console_output_style = "progress"
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "-ra"
+]
+minversion = "6.0"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = [
+    "build",
+    "dist",
+    "jupyter",
+    "mditre_paper_results"
+]
+
+[tool.coverage.run]
+source = ["mditre"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "setup.py"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod"
+]

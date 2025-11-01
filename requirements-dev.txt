@@ -1,0 +1,29 @@
+# Development dependencies for MDITRE
+# Install with: pip install -r requirements-dev.txt
+
+# First install core dependencies
+-r requirements.txt
+
+# Testing
+pytest==7.4.4
+pytest-cov==4.1.0
+pytest-xdist==3.5.0  # Parallel testing
+
+# Code quality
+black==24.3.0
+flake8==7.0.0
+isort==5.13.2
+mypy==1.9.0
+
+# Jupyter development
+jupyterlab==4.1.5
+ipykernel==6.29.3
+notebook==7.1.2
+
+# Documentation
+sphinx==7.2.6
+sphinx-rtd-theme==2.0.0
+myst-parser==2.0.0
+
+# Optional visualization
+PyQt5==5.15.10
