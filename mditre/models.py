@@ -1,3 +1,21 @@
+"""
+MDITRE Models - Original Implementation
+
+This module contains the original monolithic implementation of MDITRE layers and models.
+It is kept for backward compatibility with existing code and saved model checkpoints.
+
+NOTE: A new modular architecture is available in mditre/layers/ and mditre/core/
+The modular design separates the 5 MDITRE layers into independent, composable modules:
+- mditre.layers.layer1_phylogenetic_focus: SpatialAgg, SpatialAggDynamic
+- mditre.layers.layer2_temporal_focus: TimeAgg, TimeAggAbun
+- mditre.layers.layer3_detector: Threshold, Slope
+- mditre.layers.layer4_rule: Rules
+- mditre.layers.layer5_classification: DenseLayer, DenseLayerAbun
+
+For new projects, consider using the modular layers for better extensibility.
+See MODULAR_ARCHITECTURE.md for migration guide and design documentation.
+"""
+
 import numpy as np
 from scipy.special import logit
 
