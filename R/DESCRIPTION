@@ -1,0 +1,47 @@
+Package: mditre
+Type: Package
+Title: Microbial Dynamics Interpretable Transformer-based Rule Engine
+Version: 2.0.0
+Date: 2025-11-01
+Authors@R: c(
+    person("MDITRE", "Development Team", role = c("aut", "cre"),
+           email = "mditre@example.com")
+    )
+Description: MDITRE is a deep learning framework for analyzing longitudinal 
+    microbiome time-series data. It implements a 5-layer fully differentiable 
+    neural network architecture that learns human-interpretable rules combining 
+    phylogenetic relationships and temporal dynamics. This R implementation 
+    provides integration with phyloseq and the Bioconductor ecosystem.
+License: GPL-3
+URL: https://github.com/yourusername/mditre
+BugReports: https://github.com/yourusername/mditre/issues
+Depends:
+    R (>= 4.0.0)
+Imports:
+    torch (>= 0.11.0),
+    phyloseq (>= 1.40.0),
+    ape (>= 5.6),
+    phangorn (>= 2.10.0),
+    ggplot2 (>= 3.4.0),
+    dplyr (>= 1.1.0),
+    tidyr (>= 1.3.0),
+    patchwork (>= 1.1.0),
+    ggtree (>= 3.6.0),
+    digest (>= 0.6.0),
+    seedhash
+Remotes:
+    melhzy/seedhash/R
+Suggests:
+    testthat (>= 3.0.0),
+    knitr (>= 1.42),
+    rmarkdown (>= 2.21),
+    microbiome (>= 1.20.0),
+    vegan (>= 2.6),
+    covr (>= 3.6.0)
+VignetteBuilder: knitr
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+biocViews: Microbiome, TimeCourse, DeepLearning, Classification, 
+    Phylogenetics, Metagenomics

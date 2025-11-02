@@ -1,0 +1,739 @@
+---
+title: "MDITRE Rule Interpretation Guide"
+author: "MDITRE Development Team"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{MDITRE Rule Interpretation Guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+## Overview
+
+MDITRE is designed to be interpretable through its rule-based architecture. This vignette explains:
+
+- Understanding the 5-layer neural network architecture
+- Extracting learned rules from trained models
+- Interpreting phylogenetic focus (OTU selection)
+- Interpreting temporal focus (time windows)
+- Interpreting thresholds and decision logic
+- Visualizing rules for biological insight
+- Translating rules to human-readable format
+
+## Architecture Overview
+
+### The 5 Layers
+
+```{r eval = FALSE}
+# MDITRE architecture:
+# 1. Phylogenetic Focus Layer - Selects related OTUs
+# 2. Temporal Focus Layer - Identifies critical time windows
+# 3. Threshold Detector Layer - Applies soft thresholds
+# 4. Rule Layer - Combines detections into rules
+# 5. Classification Layer - Makes final prediction
+
+# Each rule is independent and interpretable
+```
+
+### Rule Structure
+
+Each rule in MDITRE has the following components:
+
+1. **OTU Selection** (kappa, eta): Which microbes are relevant?
+2. **Temporal Focus** (mu, sigma): When is the signal important?
+3. **Threshold** (thresh): What abundance level triggers the rule?
+4. **Rule Weight** (w): How important is this rule for the outcome?
+
+## Extracting Learned Parameters
+
+### Accessing Model Parameters
+
+```{r eval = FALSE}
+library(torch)
+
+# Assume we have a trained model
+model <- trained_model
+
+# Layer 1: Phylogenetic Focus
+kappa <- model$phylo_focus$kappa  # OTU selection weights [num_rules, num_otus]
+eta <- model$phylo_focus$eta      # Phylogenetic smoothing [num_rules, 1]
+
+# Layer 2: Temporal Focus  
+mu <- model$time_focus$mu         # Time window centers [num_rules, 1]
+sigma <- model$time_focus$sigma   # Time window widths [num_rules, 1]
+
+# Layer 3: Threshold Detection
+thresh <- model$threshold_detector$thresh  # Thresholds [num_rules, 1]
+
+# Layer 4: Rule Layer
+# (combines outputs, no learnable parameters)
+
+# Layer 5: Classification
+w <- model$classification$weight  # Rule weights [num_classes, num_rules]
+b <- model$classification$bias    # Bias [num_classes]
+
+# Convert to R arrays
+kappa_vals <- as.array(kappa$cpu())
+eta_vals <- as.array(eta$cpu())
+mu_vals <- as.array(mu$cpu())
+sigma_vals <- as.array(sigma$cpu())
+thresh_vals <- as.array(thresh$cpu())
+w_vals <- as.array(w$cpu())
+```
+
+### Organizing Parameters by Rule
+
+```{r eval = FALSE}
+# Extract parameters for all rules
+extract_all_rules <- function(model, otu_names = NULL, times = NULL) {
+  num_rules <- model$phylo_focus$kappa$shape[1]
+  
+  rules <- list()
+  
+  for (r in 1:num_rules) {
+    # OTU selection (after sigmoid)
+    kappa_r <- torch_sigmoid(model$phylo_focus$kappa[r, ])
+    kappa_probs <- as.numeric(kappa_r$cpu())
+    
+    # Get top OTUs
+    top_idx <- order(kappa_probs, decreasing = TRUE)[1:10]
+    top_otus <- if (!is.null(otu_names)) otu_names[top_idx] else top_idx
+    top_probs <- kappa_probs[top_idx]
+    
+    # Temporal focus
+    mu_r <- as.numeric(model$time_focus$mu[r, 1]$cpu())
+    sigma_r <- as.numeric(torch_sigmoid(model$time_focus$sigma[r, 1])$cpu())
+    
+    # Convert mu to actual time if times provided
+    if (!is.null(times)) {
+      time_range <- max(times) - min(times)
+      mu_time <- min(times) + mu_r * time_range
+    } else {
+      mu_time <- mu_r
+    }
+    
+    # Threshold
+    thresh_r <- as.numeric(model$threshold_detector$thresh[r, 1]$cpu())
+    
+    # Classification weight
+    w_r <- as.numeric(model$classification$weight[2, r]$cpu())  # Class 1 weight
+    
+    rules[[r]] <- list(
+      rule_id = r,
+      top_otus = top_otus,
+      otu_probs = top_probs,
+      phylo_eta = as.numeric(model$phylo_focus$eta[r, 1]$cpu()),
+      time_center = mu_time,
+      time_width = sigma_r,
+      threshold = thresh_r,
+      class_weight = w_r
+    )
+  }
+  
+  rules
+}
+
+# Extract all rules
+rules <- extract_all_rules(
+  model,
+  otu_names = colnames(mditre_data$abundance),
+  times = mditre_data$times
+)
+```
+
+## Interpreting Phylogenetic Focus
+
+### OTU Selection Weights (kappa)
+
+```{r eval = FALSE}
+# For a specific rule
+rule_idx <- 1
+rule <- rules[[rule_idx]]
+
+cat(sprintf("\nRule %d - OTU Selection:\n", rule_idx))
+cat("Top 10 OTUs:\n")
+for (i in 1:length(rule$top_otus)) {
+  cat(sprintf("  %d. %s (prob: %.4f)\n", 
+              i, rule$top_otus[i], rule$otu_probs[i]))
+}
+```
+
+### Phylogenetic Smoothing (eta)
+
+```{r eval = FALSE}
+# eta controls how much neighboring OTUs are included
+# eta ~ 0: only selected OTUs
+# eta ~ 1: includes phylogenetically related OTUs
+
+cat(sprintf("\nPhylogenetic smoothing (eta): %.4f\n", rule$phylo_eta))
+
+if (rule$phylo_eta < 0.3) {
+  cat("Interpretation: Focuses on specific OTUs\n")
+} else if (rule$phylo_eta < 0.7) {
+  cat("Interpretation: Considers phylogenetically related OTUs\n")
+} else {
+  cat("Interpretation: Broadly considers related microbial groups\n")
+}
+```
+
+### Visualizing OTU Selection
+
+```{r eval = FALSE}
+# Bar plot of OTU selection weights
+plot_otu_selection <- function(rule, max_otus = 20) {
+  library(ggplot2)
+  
+  # Sort OTUs by probability
+  sorted_idx <- order(rule$otu_probs, decreasing = TRUE)[1:max_otus]
+  
+  df <- data.frame(
+    otu = rule$top_otus[sorted_idx],
+    prob = rule$otu_probs[sorted_idx]
+  )
+  df$otu <- factor(df$otu, levels = rev(df$otu))
+  
+  ggplot(df, aes(x = otu, y = prob)) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+    coord_flip() +
+    labs(
+      title = sprintf("Rule %d: OTU Selection", rule$rule_id),
+      x = "OTU",
+      y = "Selection Probability"
+    ) +
+    theme_minimal()
+}
+
+plot_otu_selection(rules[[1]])
+```
+
+### Phylogenetic Tree Visualization
+
+```{r eval = FALSE}
+# Visualize selected OTUs on phylogenetic tree
+if (!is.null(mditre_data$phylo_tree)) {
+  library(ggtree)
+  
+  # Get weights for this rule
+  weights <- rule$otu_probs
+  names(weights) <- rule$top_otus
+  
+  plot_phylogenetic_tree(
+    mditre_data$phylo_tree,
+    weights = weights,
+    highlight_threshold = 0.5
+  )
+}
+```
+
+## Interpreting Temporal Focus
+
+### Time Window Parameters
+
+```{r eval = FALSE}
+# mu: center of time window
+# sigma: width of time window
+
+cat(sprintf("\nRule %d - Temporal Focus:\n", rule_idx))
+cat(sprintf("  Time window center: %.2f days\n", rule$time_center))
+cat(sprintf("  Time window width: %.2f\n", rule$time_width))
+
+# Calculate effective time range (mean ± 2*sigma covers ~95%)
+time_start <- rule$time_center - 2 * rule$time_width * 
+              (max(mditre_data$times) - min(mditre_data$times))
+time_end <- rule$time_center + 2 * rule$time_width * 
+            (max(mditre_data$times) - min(mditre_data$times))
+
+cat(sprintf("  Effective range: [%.2f, %.2f] days\n", time_start, time_end))
+```
+
+### Visualizing Temporal Focus
+
+```{r eval = FALSE}
+# Plot time window
+plot_temporal_focus <- function(rule, times) {
+  library(ggplot2)
+  
+  # Create time grid
+  time_seq <- seq(min(times), max(times), length.out = 100)
+  time_normalized <- (time_seq - min(times)) / (max(times) - min(times))
+  
+  # Compute Gaussian window
+  mu_norm <- (rule$time_center - min(times)) / (max(times) - min(times))
+  weights <- exp(-0.5 * ((time_normalized - mu_norm) / rule$time_width)^2)
+  
+  df <- data.frame(time = time_seq, weight = weights)
+  
+  ggplot(df, aes(x = time, y = weight)) +
+    geom_line(color = "steelblue", size = 1) +
+    geom_area(alpha = 0.3, fill = "steelblue") +
+    geom_vline(xintercept = rule$time_center, linetype = "dashed", color = "red") +
+    labs(
+      title = sprintf("Rule %d: Temporal Focus", rule$rule_id),
+      x = "Time (days)",
+      y = "Focus Weight"
+    ) +
+    theme_minimal()
+}
+
+plot_temporal_focus(rules[[1]], mditre_data$times)
+```
+
+### Multiple Rules Temporal Comparison
+
+```{r eval = FALSE}
+# Compare temporal focus across rules
+plot_all_temporal_focus <- function(rules, times) {
+  library(ggplot2)
+  library(dplyr)
+  
+  time_seq <- seq(min(times), max(times), length.out = 100)
+  
+  df <- data.frame()
+  for (rule in rules) {
+    time_normalized <- (time_seq - min(times)) / (max(times) - min(times))
+    mu_norm <- (rule$time_center - min(times)) / (max(times) - min(times))
+    weights <- exp(-0.5 * ((time_normalized - mu_norm) / rule$time_width)^2)
+    
+    df <- rbind(df, data.frame(
+      rule_id = sprintf("Rule %d", rule$rule_id),
+      time = time_seq,
+      weight = weights
+    ))
+  }
+  
+  ggplot(df, aes(x = time, y = weight, color = rule_id)) +
+    geom_line(size = 1) +
+    labs(
+      title = "Temporal Focus Comparison",
+      x = "Time (days)",
+      y = "Focus Weight",
+      color = "Rule"
+    ) +
+    theme_minimal()
+}
+
+plot_all_temporal_focus(rules, mditre_data$times)
+```
+
+## Interpreting Thresholds
+
+### Threshold Values
+
+```{r eval = FALSE}
+cat(sprintf("\nRule %d - Threshold:\n", rule_idx))
+cat(sprintf("  Threshold value: %.4f\n", rule$threshold))
+
+# Interpret threshold
+if (rule$threshold < -1) {
+  cat("  Interpretation: Triggers at low abundance\n")
+} else if (rule$threshold < 1) {
+  cat("  Interpretation: Triggers at moderate abundance\n")
+} else {
+  cat("  Interpretation: Triggers at high abundance\n")
+}
+```
+
+### Threshold Effect
+
+```{r eval = FALSE}
+# Visualize soft threshold function
+plot_threshold_function <- function(thresh) {
+  library(ggplot2)
+  
+  x <- seq(-5, 5, length.out = 100)
+  y <- 1 / (1 + exp(-(x - thresh)))  # Sigmoid threshold
+  
+  df <- data.frame(input = x, output = y)
+  
+  ggplot(df, aes(x = input, y = output)) +
+    geom_line(size = 1, color = "steelblue") +
+    geom_vline(xintercept = thresh, linetype = "dashed", color = "red") +
+    geom_hline(yintercept = 0.5, linetype = "dashed", alpha = 0.5) +
+    annotate("text", x = thresh, y = 0.9, 
+             label = sprintf("Threshold: %.2f", thresh)) +
+    labs(
+      title = "Soft Threshold Function",
+      x = "Aggregated Signal",
+      y = "Detection Probability"
+    ) +
+    theme_minimal()
+}
+
+plot_threshold_function(rule$threshold)
+```
+
+## Interpreting Classification Weights
+
+### Rule Importance
+
+```{r eval = FALSE}
+# Classification weights indicate rule importance
+cat(sprintf("\nRule %d - Classification:\n", rule_idx))
+cat(sprintf("  Weight for positive class: %.4f\n", rule$class_weight))
+
+if (rule$class_weight > 0) {
+  cat("  Interpretation: Rule increases disease probability\n")
+} else {
+  cat("  Interpretation: Rule decreases disease probability\n")
+}
+
+# Compare all rule weights
+all_weights <- sapply(rules, function(r) r$class_weight)
+cat("\nAll rule weights:\n")
+for (i in 1:length(all_weights)) {
+  cat(sprintf("  Rule %d: %+.4f\n", i, all_weights[i]))
+}
+```
+
+### Visualizing Rule Importance
+
+```{r eval = FALSE}
+# Bar plot of rule weights
+plot_rule_weights <- function(rules) {
+  library(ggplot2)
+  
+  weights <- sapply(rules, function(r) r$class_weight)
+  df <- data.frame(
+    rule = sprintf("Rule %d", 1:length(rules)),
+    weight = weights,
+    direction = ifelse(weights > 0, "Positive", "Negative")
+  )
+  df$rule <- factor(df$rule, levels = df$rule)
+  
+  ggplot(df, aes(x = rule, y = weight, fill = direction)) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(values = c("Positive" = "red", "Negative" = "blue")) +
+    labs(
+      title = "Rule Importance for Disease Prediction",
+      x = "Rule",
+      y = "Classification Weight"
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+plot_rule_weights(rules)
+```
+
+## Translating Rules to Natural Language
+
+### Rule Summary Function
+
+```{r eval = FALSE}
+# Convert rule to human-readable text
+rule_to_text <- function(rule, direction = "increases") {
+  # OTU description
+  if (length(rule$top_otus) == 1) {
+    otu_text <- sprintf("when %s", rule$top_otus[1])
+  } else if (length(rule$top_otus) <= 3) {
+    otu_text <- sprintf("when %s", paste(rule$top_otus[1:3], collapse = ", "))
+  } else {
+    otu_text <- sprintf("when %s and %d other OTUs", 
+                       rule$top_otus[1], length(rule$top_otus) - 1)
+  }
+  
+  # Threshold description
+  if (rule$threshold < -1) {
+    thresh_text <- "are depleted"
+  } else if (rule$threshold < 1) {
+    thresh_text <- "are at moderate levels"
+  } else {
+    thresh_text <- "are elevated"
+  }
+  
+  # Time description
+  time_text <- sprintf("around day %.0f (±%.0f)", 
+                      rule$time_center,
+                      rule$time_width * 20)  # Approximate day range
+  
+  # Phylo description
+  if (rule$phylo_eta < 0.3) {
+    phylo_text <- ""
+  } else {
+    phylo_text <- "and related taxa "
+  }
+  
+  # Combine
+  sprintf(
+    "Rule %d: Disease risk %s %s %s%s %s (weight: %+.2f)",
+    rule$rule_id,
+    direction,
+    otu_text,
+    phylo_text,
+    thresh_text,
+    time_text,
+    rule$class_weight
+  )
+}
+
+# Print all rules
+print_all_rules <- function(rules) {
+  cat("\n=== LEARNED RULES ===\n\n")
+  
+  for (rule in rules) {
+    direction <- if (rule$class_weight > 0) "increases" else "decreases"
+    cat(rule_to_text(rule, direction), "\n\n")
+  }
+}
+
+print_all_rules(rules)
+```
+
+### Example Output
+
+```
+=== LEARNED RULES ===
+
+Rule 1: Disease risk increases when Bacteroides_fragilis, Escherichia_coli, Clostridium_difficile and related taxa are elevated around day 14 (±5) (weight: +2.34)
+
+Rule 2: Disease risk increases when Faecalibacterium_prausnitzii are depleted around day 7 (±3) (weight: +1.87)
+
+Rule 3: Disease risk decreases when Lactobacillus_species, Bifidobacterium_longum are at moderate levels around day 21 (±8) (weight: -1.42)
+
+...
+```
+
+## Comprehensive Rule Analysis
+
+### Complete Rule Report
+
+```{r eval = FALSE}
+# Generate detailed report for all rules
+generate_rule_report <- function(model, mditre_data, output_file = NULL) {
+  # Extract rules
+  rules <- extract_all_rules(
+    model,
+    otu_names = colnames(mditre_data$abundance),
+    times = mditre_data$times
+  )
+  
+  # Print text summary
+  print_all_rules(rules)
+  
+  # Create visualizations
+  library(patchwork)
+  
+  plots <- list()
+  
+  # 1. Rule weights
+  plots$weights <- plot_rule_weights(rules)
+  
+  # 2. Temporal focus comparison
+  plots$temporal <- plot_all_temporal_focus(rules, mditre_data$times)
+  
+  # 3. Individual rule details (first 3 rules)
+  for (i in 1:min(3, length(rules))) {
+    plots[[sprintf("otu_%d", i)]] <- plot_otu_selection(rules[[i]])
+    plots[[sprintf("time_%d", i)]] <- plot_temporal_focus(rules[[i]], mditre_data$times)
+  }
+  
+  # Combine plots
+  combined <- wrap_plots(plots, ncol = 2)
+  
+  # Save if output file provided
+  if (!is.null(output_file)) {
+    ggsave(output_file, combined, width = 14, height = 10)
+  }
+  
+  list(rules = rules, plots = combined)
+}
+
+# Use it
+report <- generate_rule_report(
+  model = trained_model,
+  mditre_data = mditre_data,
+  output_file = "rule_interpretation.pdf"
+)
+```
+
+## Understanding Rule Interactions
+
+### Rule Firing Analysis
+
+```{r eval = FALSE}
+# Analyze which rules fire for specific samples
+analyze_rule_firing <- function(model, data, sample_idx) {
+  # Forward pass with intermediate outputs
+  model$eval()
+  
+  with_no_grad({
+    abundance <- data$abundance[sample_idx, , , drop = FALSE]
+    slopes <- data$slopes[sample_idx, , , drop = FALSE]
+    
+    # Layer 1: Phylogenetic focus
+    phylo_out <- model$phylo_focus(list(abundance, slopes))
+    
+    # Layer 2: Temporal focus
+    time_out <- model$time_focus(phylo_out)
+    
+    # Layer 3: Threshold detection
+    detect_out <- model$threshold_detector(time_out)
+    
+    # Layer 4: Rule formation
+    rule_out <- model$rule_layer(detect_out)
+    
+    # Get firing probabilities
+    rule_probs <- as.numeric(rule_out$cpu())
+  })
+  
+  cat(sprintf("\nSample %d - Rule Firing:\n", sample_idx))
+  for (i in 1:length(rule_probs)) {
+    status <- if (rule_probs[i] > 0.5) "FIRED" else "not fired"
+    cat(sprintf("  Rule %d: %.4f [%s]\n", i, rule_probs[i], status))
+  }
+  
+  rule_probs
+}
+
+# Analyze specific sample
+rule_firing <- analyze_rule_firing(model, test_data, sample_idx = 1)
+```
+
+### Rule Activation Patterns
+
+```{r eval = FALSE}
+# Analyze rule activation across all test samples
+analyze_all_samples <- function(model, data_loader) {
+  model$eval()
+  
+  all_activations <- list()
+  all_labels <- c()
+  
+  with_no_grad({
+    for (batch in data_loader) {
+      # Forward pass to rule layer
+      phylo_out <- model$phylo_focus(list(batch$abundance, batch$slopes))
+      time_out <- model$time_focus(phylo_out)
+      detect_out <- model$threshold_detector(time_out)
+      rule_out <- model$rule_layer(detect_out)
+      
+      all_activations[[length(all_activations) + 1]] <- as.matrix(rule_out$cpu())
+      all_labels <- c(all_labels, as.numeric(batch$labels$cpu()))
+    }
+  })
+  
+  # Combine all batches
+  activations <- do.call(rbind, all_activations)
+  
+  # Analyze by class
+  class_0_acts <- colMeans(activations[all_labels == 0, ])
+  class_1_acts <- colMeans(activations[all_labels == 1, ])
+  
+  cat("\nAverage Rule Activations:\n")
+  cat("Rule  | Class 0 | Class 1 | Difference\n")
+  cat("------|---------|---------|------------\n")
+  for (i in 1:ncol(activations)) {
+    diff <- class_1_acts[i] - class_0_acts[i]
+    cat(sprintf("%5d | %7.4f | %7.4f | %+.4f\n", 
+                i, class_0_acts[i], class_1_acts[i], diff))
+  }
+  
+  list(
+    activations = activations,
+    labels = all_labels,
+    class_0_mean = class_0_acts,
+    class_1_mean = class_1_acts
+  )
+}
+
+# Run analysis
+activation_analysis <- analyze_all_samples(model, test_loader)
+```
+
+### Visualizing Activation Patterns
+
+```{r eval = FALSE}
+# Heatmap of rule activations
+plot_activation_heatmap <- function(activation_analysis) {
+  library(ggplot2)
+  library(reshape2)
+  
+  # Sort samples by label then by activation
+  df <- data.frame(
+    activation_analysis$activations,
+    label = activation_analysis$labels
+  )
+  df <- df[order(df$label), ]
+  
+  # Reshape for heatmap
+  df$sample <- 1:nrow(df)
+  df_melt <- melt(df, id.vars = c("sample", "label"))
+  
+  ggplot(df_melt, aes(x = variable, y = sample, fill = value)) +
+    geom_tile() +
+    scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0.5) +
+    labs(
+      title = "Rule Activation Patterns",
+      x = "Rule",
+      y = "Sample",
+      fill = "Activation"
+    ) +
+    theme_minimal()
+}
+
+plot_activation_heatmap(activation_analysis)
+```
+
+## Case Studies
+
+### Example: Type 1 Diabetes Prediction
+
+```{r eval = FALSE}
+# Hypothetical interpretation example
+
+cat("\n=== MDITRE T1D Prediction Model ===\n\n")
+
+cat("Rule 1: High Risk Signal\n")
+cat("  When Bacteroides and Prevotella groups are elevated\n")
+cat("  Around 6-12 months of age\n")
+cat("  Increases T1D risk (weight: +2.1)\n")
+cat("  Biological interpretation: Early dysbiosis marker\n\n")
+
+cat("Rule 2: Protective Signal\n")
+cat("  When Bifidobacterium and Lactobacillus are abundant\n")
+cat("  Throughout early life (0-18 months)\n")
+cat("  Decreases T1D risk (weight: -1.8)\n")
+cat("  Biological interpretation: Protective commensal bacteria\n\n")
+
+cat("Rule 3: Specific Marker\n")
+cat("  When Clostridium cluster IV is depleted\n")
+cat("  Around 3 months\n")
+cat("  Increases T1D risk (weight: +1.5)\n")
+cat("  Biological interpretation: SCFA producers depletion\n\n")
+
+cat("Overall Model Interpretation:\n")
+cat("  The model identifies early-life microbiome signatures\n")
+cat("  associated with T1D development, including dysbiosis\n")
+cat("  patterns and protective bacterial groups.\n")
+```
+
+## Best Practices
+
+1. **Always visualize rules**: Don't rely only on numerical values
+2. **Consider biological context**: Interpret rules with domain knowledge
+3. **Validate findings**: Check if learned rules match known biology
+4. **Compare across datasets**: See if rules generalize
+5. **Check rule redundancy**: Multiple rules may capture similar patterns
+6. **Analyze rule interactions**: How do rules combine for predictions?
+
+## Next Steps
+
+- See `vignette("training")` for model training
+- See `vignette("evaluation")` for performance evaluation
+- See examples in `examples/interpretation_examples.R`
+
+## Session Info
+
+```{r}
+sessionInfo()
+```

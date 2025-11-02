@@ -1,0 +1,381 @@
+---
+title: "R MDITRE Tutorial 1: Getting Started"
+author: "R MDITRE Package"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Introduction to R MDITRE
+
+This tutorial introduces the R MDITRE package for analyzing microbiome time-series data. MDITRE (Microbiome Dynamics Inference via Temporal REgularization) is a neural network framework that learns interpretable rules from longitudinal microbiome data.
+
+## Architecture Overview
+
+**Two-Package Design:**
+
+```
+R MDITRE (Frontend)              Python MDITRE (Backend)
+─────────────────────            ────────────────────────
+R 4.5.2                          MDITRE conda environment
+                                 Python 3.12+
+R Interface & Utilities    ←───→ PyTorch 2.6.0+cu124
+Visualization (ggplot2)   reticulate   mditre package v1.0.0
+phyloseq Integration             Native PyTorch Models
+```
+
+**Why This Design?**
+- ✅ R users get native R workflows and syntax
+- ✅ Computation happens in optimized Python PyTorch
+- ✅ Seamless integration via reticulate bridge
+- ✅ Same models and performance as Python MDITRE
+
+## Key Features
+
+- **Five-layer neural network architecture** for microbiome analysis
+- **Phylogenetic focus** - selects relevant microbial taxa
+- **Temporal focus** - identifies important time windows
+- **Interpretable rules** - learns human-readable detection patterns
+- **GPU acceleration** via Python PyTorch backend (reticulate)
+- **R-friendly** - Works with phyloseq, ggplot2, dplyr, etc.
+
+# Setup
+
+## Load Required Libraries
+
+```{r libraries}
+library(reticulate)
+library(ggplot2)
+library(dplyr)
+
+# Configure Python MDITRE backend (MDITRE conda environment)
+use_condaenv("MDITRE", required = TRUE)
+
+# Install Python MDITRE in development mode (ensures latest code)
+python_dir <- normalizePath(file.path(getwd(), "..", "..", "Python"), winslash = "/")
+if (dir.exists(python_dir)) {
+  system2("conda", args = c("run", "-n", "MDITRE", "pip", "install", "-e", python_dir), 
+          stdout = FALSE, stderr = FALSE)
+}
+
+# Import Python MDITRE modules
+torch_py <- import("torch")
+mditre_models <- import("mditre.models")
+
+cat("Environment Configuration:\n")
+cat("─────────────────────────────\n")
+cat("R MDITRE (Frontend):\n")
+cat("  R Version:", R.version.string, "\n")
+cat("  reticulate:", as.character(packageVersion("reticulate")), "\n\n")
+
+cat("Python MDITRE (Backend):\n")
+cat("  Python:", py_config()$version, "\n")
+cat("  PyTorch:", torch_py$`__version__`, "\n")
+cat("  mditre:", mditre_models$`__version__`, "\n")
+cat("  CUDA available:", torch_py$cuda$is_available(), "\n")
+
+if (torch_py$cuda$is_available()) {
+  cat("  GPU:", torch_py$cuda$get_device_name(0L), "\n")
+}
+cat("\nBridge: reticulate connects R 4.5.2 → Python MDITRE (conda: MDITRE)\n")
+```
+
+## Check Package Status
+
+```{r check_package}
+# Verify R MDITRE package structure
+r_package_dir <- "d:/Github/mditre/R"
+
+if (dir.exists(r_package_dir)) {
+  cat("✓ R MDITRE package directory found\n")
+  
+  # Check for key files
+  r_files <- list.files(file.path(r_package_dir, "R"), pattern = "\\.R$")
+  cat(sprintf("✓ Found %d R source files\n", length(r_files)))
+  
+  test_files <- list.files(file.path(r_package_dir, "tests", "testthat"), 
+                           pattern = "^test.*\\.R$")
+  cat(sprintf("✓ Found %d test files\n", length(test_files)))
+}
+```
+
+# Example 1: Five-Layer Architecture
+
+Let's explore each of the five MDITRE layers independently.
+
+## Configuration
+
+```{r config}
+# Test configuration
+config <- list(
+  num_subjects = 40,
+  num_otus = 50,
+  num_time = 10,
+  num_rules = 3,
+  num_otu_centers = 5,
+  num_time_centers = 3,
+  emb_dim = 10
+)
+
+device <- if (torch_py$cuda$is_available()) "cuda" else "cpu"
+cat("Using device:", device, "\n")
+```
+
+## Layer 1: Phylogenetic Focus
+
+Layer 1 performs spatial aggregation to select relevant OTUs based on phylogenetic relationships.
+
+```{r layer1}
+# Create phylogenetic distance matrix
+set.seed(42)
+phylo_dist <- matrix(runif(config$num_otus * config$num_otus), 
+                     config$num_otus, config$num_otus)
+phylo_dist <- (phylo_dist + t(phylo_dist)) / 2
+diag(phylo_dist) <- 0
+
+# Create SpatialAgg layer
+layer1 <- mditre_models$SpatialAgg(
+  num_rules = config$num_rules,
+  num_otus = config$num_otus,
+  dist = phylo_dist
+)$to(device)
+
+cat("Layer 1 - Phylogenetic Focus:\n")
+cat(sprintf("  Input: [batch, %d OTUs, %d time]\n", config$num_otus, config$num_time))
+cat(sprintf("  Output: [batch, %d rules, OTU centers, %d time]\n", 
+            config$num_rules, config$num_time))
+```
+
+## Layer 2: Temporal Focus
+
+Layer 2 aggregates over time to focus on relevant temporal windows.
+
+```{r layer2}
+# Create TimeAgg layer
+layer2 <- mditre_models$TimeAgg(
+  num_rules = config$num_rules,
+  num_otus = config$num_otus,
+  num_time = config$num_time,
+  num_time_centers = config$num_time_centers
+)$to(device)
+
+cat("Layer 2 - Temporal Focus:\n")
+cat(sprintf("  Input: [batch, %d rules, %d OTUs, %d time]\n", 
+            config$num_rules, config$num_otus, config$num_time))
+cat("  Output: (abundance, slope) tensors\n")
+cat(sprintf("    - Abundance: [batch, %d rules, %d OTUs]\n", 
+            config$num_rules, config$num_otus))
+cat(sprintf("    - Slope: [batch, %d rules, %d OTUs]\n", 
+            config$num_rules, config$num_otus))
+```
+
+## Layer 3: Detectors
+
+Layer 3 applies threshold and slope detectors.
+
+```{r layer3}
+# Threshold detector
+threshold_layer <- mditre_models$Threshold(
+  num_rules = config$num_rules,
+  num_otus = config$num_otus,
+  num_time_centers = config$num_time_centers
+)$to(device)
+
+# Slope detector
+slope_layer <- mditre_models$Slope(
+  num_rules = config$num_rules,
+  num_otus = config$num_otus,
+  num_time_centers = config$num_time_centers
+)$to(device)
+
+cat("Layer 3 - Detectors:\n")
+cat("  Threshold detector: sigmoid(abundance - threshold)\n")
+cat("  Slope detector: sigmoid(slope - threshold)\n")
+cat(sprintf("  Output: [batch, %d rules, %d OTUs]\n", 
+            config$num_rules, config$num_otus))
+```
+
+## Layer 4: Rule Logic
+
+Layer 4 combines detectors using soft AND logic.
+
+```{r layer4}
+# Rules layer
+rules_layer <- mditre_models$Rules(
+  num_rules = config$num_rules,
+  num_otus = config$num_otus,
+  num_time_centers = config$num_time_centers
+)$to(device)
+
+cat("Layer 4 - Rules:\n")
+cat("  Soft AND: min(threshold_output, slope_output)\n")
+cat(sprintf("  Output: [batch, %d rules]\n", config$num_rules))
+```
+
+## Layer 5: Classification
+
+Layer 5 performs final classification.
+
+```{r layer5}
+# Dense classification layer
+classifier <- mditre_models$DenseLayer(
+  in_feat = config$num_rules,
+  out_feat = 1L
+)$to(device)
+
+cat("Layer 5 - Classification:\n")
+cat(sprintf("  Input: [batch, %d rules]\n", config$num_rules))
+cat("  Output: [batch, 1] - binary classification logit\n")
+```
+
+# Example 2: Complete MDITRE Model
+
+Now let's use the complete MDITRE model.
+
+```{r full_model}
+# Create OTU embeddings
+set.seed(42)
+otu_embeddings <- matrix(rnorm(config$num_otus * config$emb_dim), 
+                        config$num_otus, config$emb_dim)
+
+# Create MDITRE model
+model <- mditre_models$MDITRE(
+  num_rules = config$num_rules,
+  num_otus = config$num_otus,
+  num_otu_centers = config$num_otu_centers,
+  num_time = config$num_time,
+  num_time_centers = config$num_time_centers,
+  dist = otu_embeddings,
+  emb_dim = config$emb_dim
+)$to(device)
+
+cat("✓ MDITRE model created\n")
+cat(sprintf("  Parameters: %d\n", 
+            sum(sapply(py_to_r(model$parameters()), function(p) prod(dim(p))))))
+```
+
+## Initialize Model
+
+```{r init_model}
+# Import numpy
+np <- import("numpy")
+
+# Create initialization arguments
+init_args <- list(
+  kappa_init = np$array(matrix(runif(config$num_rules * config$num_otu_centers, 0.5, 2.0),
+                      config$num_rules, config$num_otu_centers)),
+  eta_init = np$array(array(rnorm(config$num_rules * config$num_otu_centers * config$emb_dim) * 0.1,
+                   dim = c(config$num_rules, config$num_otu_centers, config$emb_dim))),
+  abun_a_init = np$array(matrix(runif(config$num_rules * config$num_otu_centers, 0.2, 0.8),
+                       config$num_rules, config$num_otu_centers)),
+  abun_b_init = np$array(matrix(runif(config$num_rules * config$num_otu_centers, 0.2, 0.8),
+                       config$num_rules, config$num_otu_centers)),
+  slope_a_init = np$array(matrix(runif(config$num_rules * config$num_otu_centers, 0.2, 0.8),
+                        config$num_rules, config$num_otu_centers)),
+  slope_b_init = np$array(matrix(runif(config$num_rules * config$num_otu_centers, 0.2, 0.8),
+                        config$num_rules, config$num_otu_centers)),
+  thresh_init = np$array(matrix(runif(config$num_rules * config$num_otu_centers, 0.1, 0.5),
+                       config$num_rules, config$num_otu_centers)),
+  slope_init = np$array(matrix(runif(config$num_rules * config$num_otu_centers, -0.1, 0.1),
+                      config$num_rules, config$num_otu_centers)),
+  alpha_init = np$array(matrix(runif(config$num_rules * config$num_otu_centers, -1, 1),
+                      config$num_rules, config$num_otu_centers)),
+  w_init = np$array(matrix(rnorm(1 * config$num_rules) * 0.1, 1, config$num_rules)),
+  bias_init = np$array(c(0)),
+  beta_init = np$array(runif(config$num_rules, -1, 1))
+)
+
+model$init_params(init_args)
+cat("✓ Model parameters initialized\n")
+```
+
+## Run Inference
+
+```{r inference}
+# Create synthetic data
+set.seed(42)
+batch_size <- 10L
+X <- torch_py$randn(batch_size, config$num_otus, config$num_time)$to(device)
+mask <- torch_py$ones(batch_size, config$num_time)$to(device)
+
+# Set model to evaluation mode
+model$eval()
+
+# Forward pass
+output <- model(X, mask = mask)
+
+cat("Input shape:", sprintf("[%d, %d, %d]", batch_size, config$num_otus, config$num_time), "\n")
+cat("Output shape:", sprintf("[%d]", py_to_r(output$size(0L))), "\n")
+cat("Output (logits):\n")
+print(py_to_r(output$detach()$cpu()$numpy())[1:5])
+```
+
+## Visualize Predictions
+
+```{r visualize}
+# Convert to probabilities
+probs <- py_to_r(torch_py$sigmoid(output)$detach()$cpu()$numpy())
+
+# Create data frame
+results_df <- data.frame(
+  Sample = 1:batch_size,
+  Probability = probs,
+  Prediction = ifelse(probs > 0.5, "Positive", "Negative")
+)
+
+# Plot
+ggplot(results_df, aes(x = Sample, y = Probability, fill = Prediction)) +
+  geom_col() +
+  geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
+  scale_fill_manual(values = c("Negative" = "#E74C3C", "Positive" = "#3498DB")) +
+  labs(
+    title = "MDITRE Model Predictions",
+    subtitle = "Classification probabilities for synthetic microbiome data",
+    x = "Sample",
+    y = "Probability"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "top"
+  )
+```
+
+# Summary
+
+This tutorial demonstrated:
+
+1. ✅ Setting up R MDITRE with Python PyTorch backend
+2. ✅ Exploring the five-layer architecture independently
+3. ✅ Creating and initializing a complete MDITRE model
+4. ✅ Running inference on synthetic data
+5. ✅ Visualizing predictions
+
+## Next Steps
+
+- **Tutorial 2**: Training MDITRE on real microbiome data
+- **Tutorial 3**: Interpreting learned rules and patterns
+- **Tutorial 4**: Advanced topics (hyperparameter tuning, cross-validation)
+
+# System Information
+
+```{r session_info}
+cat("R Version:", R.version.string, "\n")
+cat("Python Version:", py_config()$version, "\n")
+cat("PyTorch Version:", torch_py$`__version__`, "\n")
+cat("CUDA Available:", torch_py$cuda$is_available(), "\n")
+cat("Device:", device, "\n")
+```
+
+---
+
+**R MDITRE Package** | Version 2.0.0 | November 2025

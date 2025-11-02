@@ -1,0 +1,739 @@
+---
+title: "MDITRE Evaluation and Model Comparison"
+author: "MDITRE Development Team"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{MDITRE Evaluation and Model Comparison}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+## Overview
+
+This vignette covers:
+
+- Model evaluation metrics
+- Cross-validation strategies
+- Model comparison methods
+- Statistical testing
+- Visualization of results
+- Performance benchmarking
+
+## Evaluation Metrics
+
+### Basic Metrics
+
+```{r eval = FALSE}
+library(torch)
+
+# Evaluate trained model
+eval_result <- evaluate_model_on_data(
+  model = trained_model,
+  data_loader = test_loader,
+  return_predictions = TRUE
+)
+
+# Access metrics
+metrics <- eval_result$metrics
+
+cat("Accuracy:", metrics$accuracy, "\n")
+cat("Precision:", metrics$precision, "\n")
+cat("Recall:", metrics$recall, "\n")
+cat("F1 Score:", metrics$f1, "\n")
+cat("AUC-ROC:", metrics$auc_roc, "\n")
+```
+
+### Confusion Matrix
+
+```{r eval = FALSE}
+# Get confusion matrix
+cm <- metrics$confusion_matrix
+
+cat("\nConfusion Matrix:\n")
+cat(sprintf("  TN: %d  FP: %d\n", cm$tn, cm$fp))
+cat(sprintf("  FN: %d  TP: %d\n", cm$fn, cm$tp))
+
+# Calculate additional metrics
+specificity <- cm$tn / (cm$tn + cm$fp)
+sensitivity <- cm$tp / (cm$tp + cm$fn)
+ppv <- cm$tp / (cm$tp + cm$fp)  # Positive predictive value
+npv <- cm$tn / (cm$tn + cm$fn)  # Negative predictive value
+
+cat("\nAdditional Metrics:\n")
+cat("Specificity:", specificity, "\n")
+cat("Sensitivity:", sensitivity, "\n")
+cat("PPV:", ppv, "\n")
+cat("NPV:", npv, "\n")
+```
+
+### ROC Curve and AUC
+
+```{r eval = FALSE}
+# ROC curve data
+roc <- metrics$roc_curve
+cat("ROC curve with", nrow(roc), "points\n")
+cat("AUC:", metrics$auc_roc, "\n")
+
+# Find optimal threshold
+best_idx <- which.max(roc$tpr - roc$fpr)
+optimal_threshold <- roc$threshold[best_idx]
+cat("Optimal threshold:", optimal_threshold, "\n")
+
+# Visualize ROC
+plot_roc_curve(
+  predictions = eval_result$predictions,
+  labels = eval_result$labels
+)
+```
+
+### Per-Class Metrics
+
+```{r eval = FALSE}
+# For multi-class or detailed binary analysis
+compute_per_class_metrics <- function(predictions, labels, threshold = 0.5) {
+  pred_binary <- as.integer(predictions > threshold)
+  
+  # Class 0 metrics
+  class_0_mask <- labels == 0
+  class_0_acc <- sum(pred_binary[class_0_mask] == 0) / sum(class_0_mask)
+  
+  # Class 1 metrics
+  class_1_mask <- labels == 1
+  class_1_acc <- sum(pred_binary[class_1_mask] == 1) / sum(class_1_mask)
+  
+  list(
+    class_0_accuracy = class_0_acc,
+    class_1_accuracy = class_1_acc,
+    balanced_accuracy = (class_0_acc + class_1_acc) / 2
+  )
+}
+
+per_class <- compute_per_class_metrics(
+  eval_result$predictions,
+  eval_result$labels
+)
+print(per_class)
+```
+
+## Cross-Validation
+
+### K-Fold Cross-Validation
+
+```{r eval = FALSE}
+# Standard k-fold CV
+cv_results <- cross_validate_mditre(
+  data = mditre_data,
+  k = 5,
+  model_params = list(
+    num_rules = 5,
+    num_otus = mditre_data$num_otus,
+    num_time = mditre_data$num_time,
+    dist = mditre_data$phylo_dist,
+    times = mditre_data$times
+  ),
+  train_params = list(
+    epochs = 200,
+    learning_rate = 0.001,
+    early_stopping_patience = 30
+  ),
+  stratified = TRUE,
+  seed = 42
+)
+
+# Summary statistics
+cat("\nCross-Validation Results (Mean ± SD):\n")
+cat(sprintf("Accuracy: %.4f ± %.4f\n",
+            cv_results$mean_metrics$accuracy,
+            cv_results$std_metrics$accuracy))
+cat(sprintf("F1 Score: %.4f ± %.4f\n",
+            cv_results$mean_metrics$f1,
+            cv_results$std_metrics$f1))
+cat(sprintf("AUC-ROC: %.4f ± %.4f\n",
+            cv_results$mean_metrics$auc_roc,
+            cv_results$std_metrics$auc_roc))
+```
+
+### Leave-One-Subject-Out CV
+
+```{r eval = FALSE}
+# LOSO-CV for subject-level evaluation
+loso_cv <- function(data, model_params, train_params) {
+  unique_subjects <- unique(data$subjects)
+  n_subjects <- length(unique_subjects)
+  
+  fold_results <- list()
+  
+  for (i in seq_along(unique_subjects)) {
+    cat(sprintf("Fold %d/%d - Subject: %s\n", i, n_subjects, unique_subjects[i]))
+    
+    # Split by subject
+    test_mask <- data$subjects == unique_subjects[i]
+    train_mask <- !test_mask
+    
+    train_data <- list(
+      abundance = data$abundance[train_mask, , ],
+      slopes = data$slopes[train_mask, , ],
+      labels = data$labels[train_mask],
+      subjects = data$subjects[train_mask]
+    )
+    
+    test_data <- list(
+      abundance = data$abundance[test_mask, , ],
+      slopes = data$slopes[test_mask, , ],
+      labels = data$labels[test_mask],
+      subjects = data$subjects[test_mask]
+    )
+    
+    # Create loaders
+    train_loader <- create_dataloader(train_data, batch_size = 16)
+    test_loader <- create_dataloader(test_data, batch_size = 16)
+    
+    # Train model
+    model <- do.call(mditre_model, model_params)
+    result <- do.call(train_mditre, c(
+      list(model = model, train_loader = train_loader, val_loader = NULL),
+      train_params
+    ))
+    
+    # Evaluate
+    eval_result <- evaluate_model_on_data(result$model, test_loader)
+    fold_results[[i]] <- eval_result$metrics
+  }
+  
+  # Aggregate results
+  aggregate_cv_results(fold_results)
+}
+
+# Run LOSO-CV
+loso_results <- loso_cv(
+  mditre_data,
+  model_params = list(...),
+  train_params = list(...)
+)
+```
+
+### Nested Cross-Validation
+
+```{r eval = FALSE}
+# Nested CV for hyperparameter selection + performance estimation
+nested_cv <- function(data, hyperparams_grid, k_outer = 5, k_inner = 3) {
+  outer_folds <- create_cv_folds(data, k = k_outer, stratified = TRUE)
+  outer_results <- list()
+  
+  for (i in 1:k_outer) {
+    cat(sprintf("\nOuter Fold %d/%d\n", i, k_outer))
+    
+    # Outer train/test split
+    outer_train <- outer_folds$train[[i]]
+    outer_test <- outer_folds$test[[i]]
+    
+    # Inner CV for hyperparameter selection
+    inner_folds <- create_cv_folds(outer_train, k = k_inner, stratified = TRUE)
+    best_params <- NULL
+    best_inner_score <- -Inf
+    
+    for (params in hyperparams_grid) {
+      inner_scores <- numeric(k_inner)
+      
+      for (j in 1:k_inner) {
+        # Inner train/val
+        inner_train <- inner_folds$train[[j]]
+        inner_val <- inner_folds$test[[j]]
+        
+        # Train and evaluate
+        model <- create_model(params, outer_train)
+        result <- train_model(model, inner_train, inner_val)
+        inner_scores[j] <- result$val_f1
+      }
+      
+      # Average inner score
+      mean_inner_score <- mean(inner_scores)
+      if (mean_inner_score > best_inner_score) {
+        best_inner_score <- mean_inner_score
+        best_params <- params
+      }
+    }
+    
+    # Retrain with best params on full outer train set
+    final_model <- create_model(best_params, outer_train)
+    final_result <- train_model(final_model, outer_train, NULL)
+    
+    # Evaluate on outer test set
+    outer_metrics <- evaluate_model_on_data(final_result$model, outer_test)
+    outer_results[[i]] <- list(
+      metrics = outer_metrics$metrics,
+      best_params = best_params
+    )
+  }
+  
+  outer_results
+}
+```
+
+## Model Comparison
+
+### Comparing Multiple Models
+
+```{r eval = FALSE}
+# Define model configurations
+model_configs <- list(
+  list(
+    name = "MDITRE-3rules",
+    num_rules = 3,
+    use_phylo_dynamic = FALSE
+  ),
+  list(
+    name = "MDITRE-5rules",
+    num_rules = 5,
+    use_phylo_dynamic = FALSE
+  ),
+  list(
+    name = "MDITRE-7rules",
+    num_rules = 7,
+    use_phylo_dynamic = FALSE
+  ),
+  list(
+    name = "MDITRE-5rules-dynamic",
+    num_rules = 5,
+    use_phylo_dynamic = TRUE
+  )
+)
+
+# Train and evaluate all models
+comparison <- compare_models(
+  data = mditre_data,
+  model_configs = model_configs,
+  train_params = list(
+    epochs = 200,
+    learning_rate = 0.001,
+    early_stopping_patience = 30
+  ),
+  cv_folds = 5
+)
+
+# Display comparison table
+print_model_comparison(comparison)
+
+# Visualize comparison
+plot_model_comparison(comparison, metric = "f1")
+```
+
+### Comparing MDITRE vs MDITREAbun
+
+```{r eval = FALSE}
+# Standard MDITRE
+model_standard <- mditre_model(
+  num_rules = 5,
+  num_otus = mditre_data$num_otus,
+  num_time = mditre_data$num_time,
+  dist = mditre_data$phylo_dist,
+  times = mditre_data$times
+)
+
+# MDITRE with abundance features
+model_abun <- mditre_abun_model(
+  num_rules = 5,
+  num_otus = mditre_data$num_otus,
+  num_time = mditre_data$num_time,
+  dist = mditre_data$phylo_dist,
+  times = mditre_data$times
+)
+
+# Compare
+comparison <- list()
+
+for (model_name in c("MDITRE", "MDITREAbun")) {
+  model <- if (model_name == "MDITRE") model_standard else model_abun
+  
+  cv_results <- cross_validate_mditre(
+    data = mditre_data,
+    k = 5,
+    model_params = list(model = model),
+    train_params = list(epochs = 200)
+  )
+  
+  comparison[[model_name]] <- cv_results
+}
+
+# Statistical comparison
+compare_two_models(comparison$MDITRE, comparison$MDITREAbun)
+```
+
+### Benchmarking Against Baselines
+
+```{r eval = FALSE}
+# Logistic regression baseline
+baseline_logreg <- function(data, test_idx) {
+  # Flatten abundance data
+  X_train <- as.matrix(data$abundance[-test_idx, , ])
+  dim(X_train) <- c(nrow(X_train), prod(dim(X_train)[-1]))
+  y_train <- as.numeric(data$labels[-test_idx])
+  
+  X_test <- as.matrix(data$abundance[test_idx, , ])
+  dim(X_test) <- c(nrow(X_test), prod(dim(X_test)[-1]))
+  y_test <- as.numeric(data$labels[test_idx])
+  
+  # Train logistic regression
+  model <- glm(y_train ~ X_train, family = "binomial")
+  preds <- predict(model, newdata = data.frame(X_train = X_test), type = "response")
+  
+  compute_metrics(preds, y_test)
+}
+
+# Random forest baseline
+baseline_rf <- function(data, test_idx) {
+  library(randomForest)
+  
+  X_train <- as.matrix(data$abundance[-test_idx, , ])
+  dim(X_train) <- c(nrow(X_train), prod(dim(X_train)[-1]))
+  y_train <- as.factor(data$labels[-test_idx])
+  
+  X_test <- as.matrix(data$abundance[test_idx, , ])
+  dim(X_test) <- c(nrow(X_test), prod(dim(X_test)[-1]))
+  y_test <- as.numeric(as.character(data$labels[test_idx]))
+  
+  rf <- randomForest(X_train, y_train)
+  preds <- predict(rf, X_test, type = "prob")[, 2]
+  
+  compute_metrics(preds, y_test)
+}
+
+# Compare MDITRE vs baselines
+benchmark <- list(
+  MDITRE = mditre_cv_results,
+  LogisticRegression = baseline_logreg_results,
+  RandomForest = baseline_rf_results
+)
+
+plot_model_comparison(benchmark, metric = "f1")
+```
+
+## Statistical Testing
+
+### Paired t-test for CV Results
+
+```{r eval = FALSE}
+# Compare two models using paired t-test
+compare_two_models <- function(cv_results1, cv_results2, metric = "f1") {
+  scores1 <- sapply(cv_results1$fold_metrics, function(x) x[[metric]])
+  scores2 <- sapply(cv_results2$fold_metrics, function(x) x[[metric]])
+  
+  # Paired t-test
+  test_result <- t.test(scores1, scores2, paired = TRUE)
+  
+  cat(sprintf("\nPaired t-test for %s:\n", metric))
+  cat(sprintf("Model 1: %.4f ± %.4f\n", mean(scores1), sd(scores1)))
+  cat(sprintf("Model 2: %.4f ± %.4f\n", mean(scores2), sd(scores2)))
+  cat(sprintf("t-statistic: %.4f\n", test_result$statistic))
+  cat(sprintf("p-value: %.4f\n", test_result$p.value))
+  
+  if (test_result$p.value < 0.05) {
+    cat("Significant difference detected (p < 0.05)\n")
+  } else {
+    cat("No significant difference (p >= 0.05)\n")
+  }
+  
+  test_result
+}
+
+# Use it
+test_result <- compare_two_models(cv_results1, cv_results2, metric = "f1")
+```
+
+### McNemar's Test
+
+```{r eval = FALSE}
+# For comparing binary predictions
+mcnemar_test <- function(preds1, preds2, labels) {
+  correct1 <- preds1 == labels
+  correct2 <- preds2 == labels
+  
+  # Build contingency table
+  n_both_correct <- sum(correct1 & correct2)
+  n_only1_correct <- sum(correct1 & !correct2)
+  n_only2_correct <- sum(!correct1 & correct2)
+  n_both_wrong <- sum(!correct1 & !correct2)
+  
+  # McNemar's test
+  test_result <- mcnemar.test(matrix(
+    c(n_both_correct, n_only2_correct,
+      n_only1_correct, n_both_wrong),
+    nrow = 2
+  ))
+  
+  cat("\nMcNemar's Test:\n")
+  cat(sprintf("Both correct: %d\n", n_both_correct))
+  cat(sprintf("Only Model 1 correct: %d\n", n_only1_correct))
+  cat(sprintf("Only Model 2 correct: %d\n", n_only2_correct))
+  cat(sprintf("Both wrong: %d\n", n_both_wrong))
+  cat(sprintf("p-value: %.4f\n", test_result$p.value))
+  
+  test_result
+}
+```
+
+### Wilcoxon Signed-Rank Test
+
+```{r eval = FALSE}
+# Non-parametric alternative to paired t-test
+wilcoxon_comparison <- function(cv_results1, cv_results2, metric = "f1") {
+  scores1 <- sapply(cv_results1$fold_metrics, function(x) x[[metric]])
+  scores2 <- sapply(cv_results2$fold_metrics, function(x) x[[metric]])
+  
+  test_result <- wilcox.test(scores1, scores2, paired = TRUE)
+  
+  cat(sprintf("\nWilcoxon Signed-Rank Test for %s:\n", metric))
+  cat(sprintf("Model 1 median: %.4f\n", median(scores1)))
+  cat(sprintf("Model 2 median: %.4f\n", median(scores2)))
+  cat(sprintf("V-statistic: %.4f\n", test_result$statistic))
+  cat(sprintf("p-value: %.4f\n", test_result$p.value))
+  
+  test_result
+}
+```
+
+## Visualization
+
+### Training History
+
+```{r eval = FALSE}
+# Plot training curves
+plot_training_history(
+  result$history,
+  metrics = c("loss", "f1", "accuracy")
+)
+
+# Compare train vs validation
+plot_train_val_comparison(result$history)
+```
+
+### ROC Curves
+
+```{r eval = FALSE}
+# Single model ROC
+plot_roc_curve(
+  predictions = eval_result$predictions,
+  labels = eval_result$labels,
+  title = "MDITRE ROC Curve"
+)
+
+# Multiple models ROC
+plot_multi_roc_curves <- function(model_results, labels) {
+  library(ggplot2)
+  
+  roc_data <- data.frame()
+  
+  for (model_name in names(model_results)) {
+    roc <- compute_roc_curve(model_results[[model_name]]$predictions, labels)
+    roc$model <- model_name
+    roc_data <- rbind(roc_data, roc)
+  }
+  
+  ggplot(roc_data, aes(x = fpr, y = tpr, color = model)) +
+    geom_line(size = 1) +
+    geom_abline(slope = 1, intercept = 0, linetype = "dashed", alpha = 0.5) +
+    labs(
+      title = "ROC Curve Comparison",
+      x = "False Positive Rate",
+      y = "True Positive Rate"
+    ) +
+    theme_minimal()
+}
+```
+
+### Confusion Matrices
+
+```{r eval = FALSE}
+# Single confusion matrix
+plot_confusion_matrix(eval_result$metrics)
+
+# Multiple confusion matrices
+library(patchwork)
+
+cm_plots <- lapply(model_results, function(res) {
+  plot_confusion_matrix(res$metrics)
+})
+
+# Combine plots
+wrap_plots(cm_plots, ncol = 2)
+```
+
+### Cross-Validation Results
+
+```{r eval = FALSE}
+# Box plots of CV metrics
+plot_cv_results(cv_results, metrics = c("accuracy", "f1", "auc_roc"))
+
+# Violin plots
+plot_cv_distribution <- function(cv_results, metric = "f1") {
+  library(ggplot2)
+  
+  scores <- sapply(cv_results$fold_metrics, function(x) x[[metric]])
+  df <- data.frame(metric = metric, value = scores)
+  
+  ggplot(df, aes(x = metric, y = value)) +
+    geom_violin(fill = "steelblue", alpha = 0.5) +
+    geom_boxplot(width = 0.1) +
+    geom_jitter(width = 0.05, alpha = 0.5) +
+    labs(title = paste("Cross-Validation:", metric),
+         y = "Score") +
+    theme_minimal()
+}
+```
+
+### Model Comparison
+
+```{r eval = FALSE}
+# Bar plot with error bars
+plot_model_comparison(
+  comparison,
+  metric = "f1",
+  sort_by = "f1"
+)
+
+# Radar chart
+plot_model_radar <- function(comparison, metrics) {
+  library(fmsb)
+  
+  # Prepare data
+  max_vals <- rep(1, length(metrics))
+  min_vals <- rep(0, length(metrics))
+  
+  radar_data <- rbind(max_vals, min_vals)
+  
+  for (model_name in names(comparison)) {
+    values <- sapply(metrics, function(m) comparison[[model_name]]$mean_metrics[[m]])
+    radar_data <- rbind(radar_data, values)
+  }
+  
+  colnames(radar_data) <- metrics
+  rownames(radar_data) <- c("Max", "Min", names(comparison))
+  
+  # Plot
+  radarchart(
+    as.data.frame(radar_data),
+    title = "Model Performance Comparison"
+  )
+}
+```
+
+## Comprehensive Evaluation Report
+
+```{r eval = FALSE}
+# Generate complete evaluation report
+create_comprehensive_report <- function(model, test_loader, history, output_file) {
+  library(patchwork)
+  
+  # Evaluate model
+  eval_result <- evaluate_model_on_data(model, test_loader, return_predictions = TRUE)
+  
+  # Create plots
+  p1 <- plot_training_history(history, metrics = c("loss", "f1"))
+  p2 <- plot_roc_curve(eval_result$predictions, eval_result$labels)
+  p3 <- plot_confusion_matrix(eval_result$metrics)
+  p4 <- plot_parameter_distributions(model, parameters = c("kappa", "eta", "thresh"))
+  
+  # Combine
+  report <- (p1 | p2) / (p3 | p4)
+  
+  # Save
+  ggsave(output_file, report, width = 12, height = 10)
+  
+  # Text summary
+  cat("\n=== EVALUATION REPORT ===\n\n")
+  cat("Test Set Performance:\n")
+  print_metrics(eval_result$metrics)
+  
+  cat("\nTraining Summary:\n")
+  cat(sprintf("Total epochs: %d\n", length(history$train_loss)))
+  cat(sprintf("Best validation F1: %.4f\n", max(history$val_f1, na.rm = TRUE)))
+  
+  eval_result
+}
+
+# Use it
+report <- create_comprehensive_report(
+  model = trained_model,
+  test_loader = test_loader,
+  history = result$history,
+  output_file = "evaluation_report.pdf"
+)
+```
+
+## Performance Benchmarking
+
+### Timing Analysis
+
+```{r eval = FALSE}
+# Measure training time
+training_time <- system.time({
+  result <- train_mditre(
+    model = model,
+    train_loader = train_loader,
+    val_loader = val_loader,
+    epochs = 200
+  )
+})
+
+cat("Training time:", training_time["elapsed"], "seconds\n")
+
+# Measure inference time
+inference_time <- system.time({
+  with_no_grad({
+    for (batch in test_loader) {
+      output <- model(list(batch$abundance, batch$slopes))
+    }
+  })
+})
+
+cat("Inference time:", inference_time["elapsed"], "seconds\n")
+cat("Samples per second:", nrow(test_data$abundance) / inference_time["elapsed"], "\n")
+```
+
+### Memory Usage
+
+```{r eval = FALSE}
+# Monitor memory
+gc()
+mem_before <- sum(gc()[, 2])
+
+# Train model
+result <- train_mditre(model, train_loader, val_loader, epochs = 200)
+
+gc()
+mem_after <- sum(gc()[, 2])
+
+cat("Memory used:", mem_after - mem_before, "MB\n")
+```
+
+## Best Practices
+
+1. **Always use validation set**: Never evaluate on training data
+2. **Use stratified splitting**: Maintain class balance in folds
+3. **Report confidence intervals**: Use CV standard deviations
+4. **Test statistical significance**: Don't rely on point estimates alone
+5. **Compare against baselines**: Establish improvement over simple methods
+6. **Use multiple metrics**: F1, AUC, accuracy, etc.
+7. **Check for overfitting**: Monitor train/validation gap
+
+## Next Steps
+
+- See `vignette("interpretation")` for rule interpretation
+- See `vignette("training")` for training details
+- See examples in `examples/evaluation_examples.R`
+
+## Session Info
+
+```{r}
+sessionInfo()
+```

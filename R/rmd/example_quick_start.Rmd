@@ -1,0 +1,284 @@
+---
+title: "R MDITRE Example: Quick Start Demo"
+author: "R MDITRE Package"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: cosmo
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 10, fig.height = 6)
+```
+
+# Quick Start: R MDITRE in 5 Minutes
+
+A rapid demonstration of R MDITRE's key capabilities.
+
+## Architecture Note
+
+**R MDITRE** is an R interface that bridges to **Python MDITRE** via reticulate:
+- **R Environment**: R 4.5.2+ (frontend - R syntax, visualization, workflows)
+- **Python Backend**: Python MDITRE in MDITRE conda environment (PyTorch computation)
+- **Bridge**: reticulate package connects R to Python seamlessly
+
+This design provides R-friendly workflows while leveraging native PyTorch performance.
+
+```{r quick_setup, message=FALSE}
+library(reticulate)
+library(ggplot2)
+
+# Setup Python MDITRE backend (MDITRE conda environment)
+use_condaenv("MDITRE", required = TRUE)
+
+# Install Python MDITRE in development mode (ensures latest code)
+python_dir <- normalizePath(file.path(getwd(), "..", "..", "Python"), winslash = "/")
+if (dir.exists(python_dir)) {
+  system2("conda", args = c("run", "-n", "MDITRE", "pip", "install", "-e", python_dir), 
+          stdout = FALSE, stderr = FALSE)
+}
+
+# Import Python MDITRE modules
+torch_py <- import("torch")
+mditre <- import("mditre.models")
+np <- import("numpy")
+
+device <- if (torch_py$cuda$is_available()) "cuda" else "cpu"
+
+cat("Environment Setup:\n")
+cat("  R Version:", R.version.string, "\n")
+cat("  Python PyTorch:", torch_py$`__version__`, "\n")
+cat("  Python MDITRE:", mditre$`__version__`, "\n")
+cat("  Device:", device, "\n")
+```
+
+# 1. Create Test Data (30 seconds)
+
+```{r data}
+set.seed(42)
+
+# Configuration
+n_subjects <- 50
+n_otus <- 30
+n_time <- 8
+
+# Generate microbiome abundances
+X <- array(0, dim = c(n_subjects, n_otus, n_time))
+for (i in 1:n_subjects) {
+  for (t in 1:n_time) {
+    abundances <- rgamma(n_otus, shape = runif(n_otus, 0.5, 2))
+    X[i, , t] <- abundances / sum(abundances)
+  }
+}
+
+# Generate labels
+y <- as.integer(apply(X[, 1:5, 1:3], 1, mean) > 0.05)
+
+cat(sprintf("✓ Data: %d subjects, %d OTUs, %d timepoints\n", n_subjects, n_otus, n_time))
+cat(sprintf("  Classes: %d negative, %d positive\n", sum(y == 0), sum(y == 1)))
+```
+
+# 2. Create Model (1 minute)
+
+```{r model}
+# Model configuration
+config <- list(
+  num_rules = 3L,
+  num_otus = 30L,
+  num_otu_centers = 5L,
+  num_time = 8L,
+  num_time_centers = 3L,
+  emb_dim = 10L
+)
+
+# Create embeddings
+embeddings <- matrix(rnorm(config$num_otus * config$emb_dim), 
+                    config$num_otus, config$emb_dim)
+
+# Create model
+model <- mditre$MDITRE(
+  num_rules = config$num_rules,
+  num_otus = config$num_otus,
+  num_otu_centers = config$num_otu_centers,
+  num_time = config$num_time,
+  num_time_centers = config$num_time_centers,
+  dist = embeddings,
+  emb_dim = config$emb_dim
+)$to(device)
+
+# Initialize
+init_args <- list(
+  kappa_init = np$random$uniform(0.5, 2.0, c(config$num_rules, config$num_otu_centers)),
+  eta_init = np$random$randn(config$num_rules, config$num_otu_centers, config$emb_dim) * 0.1,
+  abun_a_init = np$random$uniform(0.2, 0.8, c(config$num_rules, config$num_otu_centers)),
+  abun_b_init = np$random$uniform(0.2, 0.8, c(config$num_rules, config$num_otu_centers)),
+  slope_a_init = np$random$uniform(0.2, 0.8, c(config$num_rules, config$num_otu_centers)),
+  slope_b_init = np$random$uniform(0.2, 0.8, c(config$num_rules, config$num_otu_centers)),
+  thresh_init = np$random$uniform(0.1, 0.5, c(config$num_rules, config$num_otu_centers)),
+  slope_init = np$random$uniform(-0.1, 0.1, c(config$num_rules, config$num_otu_centers)),
+  alpha_init = np$random$uniform(-1, 1, c(config$num_rules, config$num_otu_centers)),
+  w_init = np$random$randn(1L, config$num_rules) * 0.1,
+  bias_init = np$zeros(1L),
+  beta_init = np$random$uniform(-1, 1, config$num_rules)
+)
+
+model$init_params(init_args)
+cat("✓ Model created and initialized\n")
+```
+
+# 3. Train (2 minutes)
+
+```{r train}
+# Convert to tensors
+X_tensor <- torch_py$from_numpy(np$array(X))$float()$to(device)
+y_tensor <- torch_py$from_numpy(np$array(as.numeric(y)))$float()$to(device)
+mask <- torch_py$ones(n_subjects, n_time)$to(device)
+
+# Training setup
+optimizer <- torch_py$optim$Adam(model$parameters(), lr = 0.01)
+criterion <- torch_py$nn$BCEWithLogitsLoss()
+
+# Quick training (20 epochs)
+losses <- numeric(20)
+
+model$train()
+for (epoch in 1:20) {
+  optimizer$zero_grad()
+  outputs <- model(X_tensor, mask = mask)
+  loss <- criterion(outputs, y_tensor)
+  loss$backward()
+  optimizer$step()
+  
+  losses[epoch] <- py_to_r(loss$item())
+}
+
+cat(sprintf("✓ Training complete (Final loss: %.4f)\n", losses[20]))
+```
+
+# 4. Evaluate (30 seconds)
+
+```{r evaluate}
+model$eval()
+
+# Predictions
+with(torch_py$no_grad(), {
+  outputs <- model(X_tensor, mask = mask)
+  probs <- torch_py$sigmoid(outputs)
+})
+
+probs_r <- py_to_r(probs$cpu()$numpy())
+preds_r <- as.integer(probs_r > 0.5)
+
+# Metrics
+accuracy <- mean(preds_r == y)
+correct_neg <- sum(preds_r == 0 & y == 0)
+correct_pos <- sum(preds_r == 1 & y == 1)
+
+cat("\n")
+cat("="*50, "\n")
+cat("RESULTS\n")
+cat("="*50, "\n")
+cat(sprintf("Accuracy: %.1f%%\n", 100 * accuracy))
+cat(sprintf("Correct Negative: %d/%d\n", correct_neg, sum(y == 0)))
+cat(sprintf("Correct Positive: %d/%d\n", correct_pos, sum(y == 1)))
+cat("="*50, "\n")
+```
+
+# 5. Visualize (1 minute)
+
+```{r visualize, fig.width=12, fig.height=8}
+library(patchwork)
+
+# Training curve
+p1 <- ggplot(data.frame(Epoch = 1:20, Loss = losses), aes(Epoch, Loss)) +
+  geom_line(color = "#3498DB", size = 1.2) +
+  geom_point(color = "#2C3E50", size = 2) +
+  labs(title = "Training Loss", y = "BCE Loss") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold"))
+
+# Predictions
+results_df <- data.frame(
+  Subject = 1:n_subjects,
+  Probability = probs_r,
+  Actual = factor(y, levels = c(0, 1), labels = c("Negative", "Positive")),
+  Correct = preds_r == y
+)
+
+p2 <- ggplot(results_df, aes(x = Subject, y = Probability, 
+                              color = Actual, shape = Correct)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_hline(yintercept = 0.5, linetype = "dashed", color = "gray50") +
+  scale_color_manual(values = c("Negative" = "#E74C3C", "Positive" = "#27AE60")) +
+  scale_shape_manual(values = c("TRUE" = 16, "FALSE" = 4), 
+                     labels = c("Incorrect", "Correct")) +
+  labs(title = "Model Predictions", y = "Probability", color = "True Class") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "top")
+
+# Confusion matrix
+cm <- table(Predicted = preds_r, Actual = y)
+cm_df <- as.data.frame(cm)
+
+p3 <- ggplot(cm_df, aes(x = factor(Actual), y = factor(Predicted), fill = Freq)) +
+  geom_tile(color = "white", size = 2) +
+  geom_text(aes(label = Freq), size = 16, fontface = "bold", color = "white") +
+  scale_fill_gradient(low = "#95A5A6", high = "#2C3E50") +
+  labs(title = "Confusion Matrix", x = "Actual", y = "Predicted") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold"),
+        legend.position = "none")
+
+# Combine
+(p1 | p3) / p2 + 
+  plot_annotation(
+    title = "R MDITRE Quick Demo Results",
+    subtitle = sprintf("Accuracy: %.1f%% | Device: %s | PyTorch: %s", 
+                      100 * accuracy, device, torch_py$`__version__`),
+    theme = theme(plot.title = element_text(size = 16, face = "bold"),
+                  plot.subtitle = element_text(size = 12))
+  )
+```
+
+# Summary
+
+**✓ Complete workflow in under 5 minutes:**
+
+- ✅ Generated synthetic microbiome data
+- ✅ Created and initialized MDITRE model
+- ✅ Trained for 20 epochs
+- ✅ Evaluated performance: **`r sprintf("%.1f%%", 100 * accuracy)` accuracy**
+- ✅ Visualized results
+
+## System Info
+
+```{r info}
+cat("="*60, "\n")
+cat("SYSTEM INFORMATION\n")
+cat("="*60, "\n\n")
+
+cat("R MDITRE (Frontend):\n")
+cat("  R Version:", R.version.string, "\n")
+cat("  reticulate:", packageVersion("reticulate"), "\n\n")
+
+cat("Python MDITRE (Backend):\n")
+cat("  Python:", py_config()$version, "\n")
+cat("  PyTorch:", torch_py$`__version__`, "\n")
+cat("  mditre:", mditre$`__version__`, "\n")
+cat("  Device:", device, "\n")
+
+if (torch_py$cuda$is_available()) {
+  cat("  GPU:", torch_py$cuda$get_device_name(0L), "\n")
+}
+
+cat("\nArchitecture: R 4.5.2 → reticulate → Python MDITRE (conda: MDITRE)\n")
+```
+
+---
+
+**R MDITRE** | Quick Start Demo | `r Sys.Date()`

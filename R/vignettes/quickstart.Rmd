@@ -1,0 +1,470 @@
+---
+title: "MDITRE Quickstart Guide"
+author: "MDITRE Development Team"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{MDITRE Quickstart Guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+## Introduction
+
+MDITRE (Microbiome Interpretable Temporal Rule Engine) is an R package for predicting disease outcomes from longitudinal microbiome data using interpretable neural network rules. This vignette provides a quick introduction to the key features of MDITRE.
+
+### Key Features
+
+- **5-layer neural network architecture** for microbiome analysis
+- **Phylogenetic focus** - soft selection of related microbial groups
+- **Temporal focus** - identification of critical time windows
+- **Interpretable rules** - human-readable decision logic
+- **Native phyloseq integration** - seamless data loading from phyloseq objects
+- **Complete training pipeline** - optimizer, loss functions, checkpointing
+- **Evaluation utilities** - metrics, cross-validation, model comparison
+- **Publication-quality visualizations** - ggplot2-based plotting
+
+## Installation
+
+```{r eval = FALSE}
+# Install from GitHub (when available)
+# devtools::install_github("username/mditre")
+
+# For now, source the files directly
+source("R/math_utils.R")
+source("R/base_layer.R")
+source("R/seeding.R")
+source("R/layer1_phylogenetic_focus.R")
+source("R/layer2_temporal_focus.R")
+source("R/layer3_detector.R")
+source("R/layer4_rule.R")
+source("R/layer5_classification.R")
+source("R/models.R")
+source("R/phyloseq_loader.R")
+source("R/trainer.R")
+source("R/evaluation.R")
+source("R/visualize.R")
+```
+
+### Required Packages
+
+```{r eval = FALSE}
+# Core dependencies
+install.packages(c("torch", "R6"))
+
+# Data handling
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("phyloseq")
+
+# Visualization
+install.packages(c("ggplot2", "patchwork"))
+BiocManager::install("ggtree")
+
+# Optional: for reproducibility
+devtools::install_github("andrewsali/seedhash")
+```
+
+## Quick Example
+
+### 1. Create Mock Data
+
+```{r eval = FALSE}
+library(torch)
+library(phyloseq)
+
+# Set seed for reproducibility
+set_mditre_seeds(42)
+
+# Create mock abundance data
+batch_size <- 100
+num_otus <- 50
+num_time <- 5
+times <- c(0, 7, 14, 21, 28)  # Days
+
+# Mock abundance matrix (samples x OTUs x timepoints)
+abundance <- torch_rand(batch_size, num_otus, num_time)
+
+# Mock slopes (rate of change)
+slopes <- torch_randn(batch_size, num_otus, num_time)
+
+# Mock phylogenetic distances
+dist_matrix <- matrix(runif(num_otus * num_otus), num_otus, num_otus)
+dist_matrix <- (dist_matrix + t(dist_matrix)) / 2
+diag(dist_matrix) <- 0
+phylo_dist <- torch_tensor(dist_matrix)
+
+# Mock labels (binary classification)
+labels <- torch_randint(0, 2, c(batch_size,))
+```
+
+### 2. Create MDITRE Model
+
+```{r eval = FALSE}
+# Model hyperparameters
+num_rules <- 5  # Number of interpretable rules
+
+# Create model
+model <- mditre_model(
+  num_rules = num_rules,
+  num_otus = num_otus,
+  num_time = num_time,
+  dist = phylo_dist,
+  times = times
+)
+
+cat("Model created with", num_rules, "rules\n")
+cat("Total parameters:", sum(sapply(model$parameters, function(p) prod(p$shape))), "\n")
+```
+
+### 3. Forward Pass
+
+```{r eval = FALSE}
+# Forward pass through model
+with_no_grad({
+  output <- model(list(abundance, slopes))
+  probs <- nnf_softmax(output, dim = 2)
+  
+  cat("Output shape:", paste(output$shape, collapse = " x "), "\n")
+  cat("First 5 predictions:\n")
+  print(as.matrix(probs[1:5, ]))
+})
+```
+
+### 4. Training Setup
+
+```{r eval = FALSE}
+# Create train/test split
+n_train <- 80
+train_idx <- 1:n_train
+test_idx <- (n_train + 1):batch_size
+
+# Create dataloaders (simplified)
+train_dataset <- list(
+  abundance = abundance[train_idx, , ],
+  slopes = slopes[train_idx, , ],
+  labels = labels[train_idx]
+)
+
+test_dataset <- list(
+  abundance = abundance[test_idx, , ],
+  slopes = slopes[test_idx, , ],
+  labels = labels[test_idx]
+)
+```
+
+### 5. Train Model (Simplified)
+
+```{r eval = FALSE}
+# Training loop (simplified version)
+num_epochs <- 50
+learning_rate <- 0.001
+
+# Optimizer
+optimizer <- optim_rmsprop(model$parameters, lr = learning_rate)
+
+# Training
+for (epoch in 1:num_epochs) {
+  # Forward pass
+  output <- model(list(train_dataset$abundance, train_dataset$slopes))
+  
+  # Compute loss
+  loss <- nnf_cross_entropy(output, train_dataset$labels)
+  
+  # Backward pass
+  optimizer$zero_grad()
+  loss$backward()
+  optimizer$step()
+  
+  if (epoch %% 10 == 0) {
+    cat(sprintf("Epoch %d/%d - Loss: %.4f\n", epoch, num_epochs, 
+                as.numeric(loss$cpu())))
+  }
+}
+```
+
+### 6. Evaluate Model
+
+```{r eval = FALSE}
+# Test set predictions
+with_no_grad({
+  test_output <- model(list(test_dataset$abundance, test_dataset$slopes))
+  test_probs <- nnf_softmax(test_output, dim = 2)
+  test_preds <- test_probs[, 2]  # Probability of class 1
+})
+
+# Compute metrics
+metrics <- compute_metrics(
+  predictions = as.numeric(test_preds$cpu()),
+  labels = as.numeric(test_dataset$labels$cpu())
+)
+
+# Display results
+print_metrics(metrics)
+```
+
+## Working with phyloseq Data
+
+### Loading Data
+
+```{r eval = FALSE}
+# Assume you have a phyloseq object: ps
+# library(phyloseq)
+# ps <- readRDS("your_phyloseq_object.rds")
+
+# Convert to MDITRE format
+mditre_data <- phyloseq_to_mditre(
+  ps,
+  subject_var = "Subject",
+  time_var = "Timepoint", 
+  outcome_var = "Disease",
+  min_abundance = 0.001,
+  min_prevalence = 0.1
+)
+
+# Print summary
+print_mditre_data_summary(mditre_data)
+```
+
+### Train/Test Split
+
+```{r eval = FALSE}
+# Split data by subjects
+split_data <- split_train_test(
+  mditre_data,
+  test_fraction = 0.2,
+  stratify = TRUE,
+  seed = 42
+)
+
+cat("Training samples:", length(split_data$train$subjects), "\n")
+cat("Test samples:", length(split_data$test$subjects), "\n")
+```
+
+### Create DataLoaders
+
+```{r eval = FALSE}
+# Create PyTorch-style dataloaders
+train_loader <- create_dataloader(
+  split_data$train,
+  batch_size = 16,
+  shuffle = TRUE
+)
+
+test_loader <- create_dataloader(
+  split_data$test,
+  batch_size = 16,
+  shuffle = FALSE
+)
+```
+
+## Complete Training Pipeline
+
+```{r eval = FALSE}
+# Create model
+model <- mditre_model(
+  num_rules = 5,
+  num_otus = mditre_data$num_otus,
+  num_time = mditre_data$num_time,
+  dist = mditre_data$phylo_dist,
+  times = mditre_data$times
+)
+
+# Train with full pipeline
+result <- train_mditre(
+  model = model,
+  train_loader = train_loader,
+  val_loader = test_loader,
+  epochs = 200,
+  learning_rate = 0.001,
+  early_stopping_patience = 30,
+  checkpoint_dir = "checkpoints",
+  verbose = TRUE
+)
+
+# Access training history
+plot_training_history(result$history, metrics = c("loss", "f1"))
+```
+
+## Evaluation and Visualization
+
+### Model Evaluation
+
+```{r eval = FALSE}
+# Evaluate on test set
+eval_result <- evaluate_model_on_data(
+  model = result$model,
+  data_loader = test_loader,
+  return_predictions = TRUE
+)
+
+# Print metrics
+print_metrics(eval_result$metrics)
+
+# Visualize results
+plot_roc_curve(eval_result$predictions, eval_result$labels)
+plot_confusion_matrix(eval_result$metrics)
+```
+
+### Cross-Validation
+
+```{r eval = FALSE}
+# K-fold cross-validation
+cv_results <- cross_validate_mditre(
+  data = mditre_data,
+  k = 5,
+  model_params = list(
+    num_rules = 5,
+    num_otus = mditre_data$num_otus,
+    num_time = mditre_data$num_time,
+    dist = mditre_data$phylo_dist,
+    times = mditre_data$times
+  ),
+  train_params = list(
+    epochs = 200,
+    learning_rate = 0.001,
+    early_stopping_patience = 30
+  ),
+  stratified = TRUE,
+  seed = 42
+)
+
+# Visualize CV results
+plot_cv_results(cv_results)
+
+# Print summary
+cat(sprintf("Mean F1: %.4f ± %.4f\n", 
+            cv_results$mean_metrics$f1,
+            cv_results$std_metrics$f1))
+```
+
+### Model Comparison
+
+```{r eval = FALSE}
+# Compare different model configurations
+model_configs <- list(
+  list(name = "MDITRE-3rules", num_rules = 3),
+  list(name = "MDITRE-5rules", num_rules = 5),
+  list(name = "MDITRE-7rules", num_rules = 7)
+)
+
+comparison <- compare_models(
+  data = mditre_data,
+  model_configs = model_configs,
+  train_params = list(epochs = 200)
+)
+
+# Visualize comparison
+plot_model_comparison(comparison, metric = "f1")
+```
+
+## Model Interpretation
+
+### Extract Learned Rules
+
+```{r eval = FALSE}
+# Access learned parameters
+kappa <- model$phylo_focus$kappa  # OTU selection weights
+eta <- model$phylo_focus$eta      # Phylogenetic focus
+mu <- model$time_focus$mu         # Temporal focus positions
+sigma <- model$time_focus$sigma   # Temporal focus widths
+thresh <- model$threshold_detector$thresh  # Thresholds
+
+# Print rule summaries
+for (rule_idx in 1:num_rules) {
+  cat(sprintf("\nRule %d:\n", rule_idx))
+  cat(sprintf("  Time focus: %.2f ± %.2f days\n", 
+              as.numeric(mu[rule_idx, 1]),
+              as.numeric(sigma[rule_idx, 1])))
+  cat(sprintf("  Threshold: %.4f\n", 
+              as.numeric(thresh[rule_idx])))
+}
+```
+
+### Visualize Parameters
+
+```{r eval = FALSE}
+# Plot parameter distributions
+plot_parameter_distributions(
+  model,
+  parameters = c("kappa", "eta", "thresh")
+)
+
+# Visualize phylogenetic tree with OTU weights
+if (!is.null(mditre_data$phylo_tree)) {
+  weights <- as.numeric(kappa[1, ]$cpu())  # First rule
+  names(weights) <- colnames(mditre_data$abundance)
+  
+  plot_phylogenetic_tree(
+    phylo_tree = mditre_data$phylo_tree,
+    weights = weights
+  )
+}
+```
+
+## Saving and Loading Models
+
+```{r eval = FALSE}
+# Save model
+model_path <- "mditre_model.pt"
+torch_save(model$state_dict(), model_path)
+cat("Model saved to:", model_path, "\n")
+
+# Load model
+new_model <- mditre_model(
+  num_rules = num_rules,
+  num_otus = num_otus,
+  num_time = num_time,
+  dist = phylo_dist,
+  times = times
+)
+new_model$load_state_dict(torch_load(model_path))
+cat("Model loaded from:", model_path, "\n")
+```
+
+## Reproducibility
+
+```{r eval = FALSE}
+# Set all random seeds for reproducibility
+set_mditre_seeds(42)
+
+# Your code here will be reproducible
+# ...
+```
+
+## Next Steps
+
+- See `vignette("training")` for detailed training guide
+- See `vignette("evaluation")` for evaluation and cross-validation
+- See `vignette("interpretation")` for rule interpretation
+- See `?mditre_model` for full API documentation
+- Check examples in `examples/` directory
+
+## Citation
+
+If you use MDITRE in your research, please cite:
+
+```
+[Citation information to be added]
+```
+
+## Getting Help
+
+- GitHub Issues: https://github.com/username/mditre/issues
+- Documentation: https://username.github.io/mditre/
+- Email: contact@example.com
+
+## Session Info
+
+```{r}
+sessionInfo()
+```

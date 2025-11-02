@@ -1,0 +1,695 @@
+---
+title: "MDITRE Training Guide"
+author: "MDITRE Development Team"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{MDITRE Training Guide}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+## Overview
+
+This vignette provides a comprehensive guide to training MDITRE models, covering:
+
+- Data preparation and loading
+- Model configuration and hyperparameters
+- Training loop customization
+- Optimization strategies
+- Early stopping and checkpointing
+- Learning rate scheduling
+- Regularization techniques
+- Best practices
+
+## Data Preparation
+
+### Loading phyloseq Data
+
+```{r eval = FALSE}
+library(phyloseq)
+library(torch)
+
+# Load your phyloseq object
+ps <- readRDS("your_data.rds")
+
+# Check data structure
+cat("Samples:", nsamples(ps), "\n")
+cat("OTUs:", ntaxa(ps), "\n")
+cat("Variables:", paste(sample_variables(ps), collapse = ", "), "\n")
+```
+
+### Converting to MDITRE Format
+
+```{r eval = FALSE}
+# Convert with filtering
+mditre_data <- phyloseq_to_mditre(
+  physeq = ps,
+  subject_var = "Subject",     # Subject identifier
+  time_var = "Timepoint",      # Time variable
+  outcome_var = "Disease",     # Binary outcome (0/1 or factor)
+  min_abundance = 0.001,       # Filter rare OTUs
+  min_prevalence = 0.1,        # Present in >= 10% samples
+  transform = "clr",           # CLR transformation
+  impute_method = "zero",      # Handle missing values
+  calculate_slopes = TRUE      # Compute rate of change
+)
+
+# Inspect results
+print_mditre_data_summary(mditre_data)
+```
+
+### Data Splitting Strategies
+
+#### Simple Train/Test Split
+
+```{r eval = FALSE}
+# Random split by subjects
+split_data <- split_train_test(
+  mditre_data,
+  test_fraction = 0.2,
+  stratify = TRUE,  # Balance outcome classes
+  seed = 42
+)
+```
+
+#### Train/Validation/Test Split
+
+```{r eval = FALSE}
+# First split: train+val vs test
+first_split <- split_train_test(
+  mditre_data,
+  test_fraction = 0.2,
+  stratify = TRUE,
+  seed = 42
+)
+
+# Second split: train vs val
+second_split <- split_train_test(
+  first_split$train,
+  test_fraction = 0.2,  # 20% of remaining 80% = 16% total
+  stratify = TRUE,
+  seed = 42
+)
+
+train_data <- second_split$train      # 64% of data
+val_data <- second_split$test         # 16% of data
+test_data <- first_split$test         # 20% of data
+```
+
+### Creating DataLoaders
+
+```{r eval = FALSE}
+# Training loader: shuffled batches
+train_loader <- create_dataloader(
+  train_data,
+  batch_size = 16,
+  shuffle = TRUE,
+  drop_last = TRUE  # Drop incomplete batches
+)
+
+# Validation loader: no shuffling
+val_loader <- create_dataloader(
+  val_data,
+  batch_size = 16,
+  shuffle = FALSE,
+  drop_last = FALSE
+)
+
+# Test loader
+test_loader <- create_dataloader(
+  test_data,
+  batch_size = 16,
+  shuffle = FALSE,
+  drop_last = FALSE
+)
+```
+
+## Model Configuration
+
+### Basic Model Setup
+
+```{r eval = FALSE}
+# Standard MDITRE model
+model <- mditre_model(
+  num_rules = 5,                      # Number of interpretable rules
+  num_otus = mditre_data$num_otus,    # Number of OTUs
+  num_time = mditre_data$num_time,    # Number of timepoints
+  dist = mditre_data$phylo_dist,      # Phylogenetic distances
+  times = mditre_data$times,          # Timepoint values
+  use_phylo_dynamic = FALSE,          # Static phylogenetic focus
+  hard_threshold = FALSE,             # Soft thresholding
+  use_softmax = TRUE                  # Softmax output layer
+)
+```
+
+### Model with Abundance Features
+
+```{r eval = FALSE}
+# MDITRE with abundance-based temporal focus
+model_abun <- mditre_abun_model(
+  num_rules = 5,
+  num_otus = mditre_data$num_otus,
+  num_time = mditre_data$num_time,
+  dist = mditre_data$phylo_dist,
+  times = mditre_data$times,
+  use_phylo_dynamic = TRUE  # Dynamic phylogenetic focus
+)
+```
+
+### Hyperparameter Selection
+
+```{r eval = FALSE}
+# Grid search over hyperparameters
+hyperparams <- expand.grid(
+  num_rules = c(3, 5, 7),
+  learning_rate = c(0.0001, 0.001, 0.01),
+  use_phylo_dynamic = c(FALSE, TRUE)
+)
+
+results <- list()
+
+for (i in 1:nrow(hyperparams)) {
+  params <- hyperparams[i, ]
+  
+  # Create model
+  model <- mditre_model(
+    num_rules = params$num_rules,
+    num_otus = mditre_data$num_otus,
+    num_time = mditre_data$num_time,
+    dist = mditre_data$phylo_dist,
+    times = mditre_data$times,
+    use_phylo_dynamic = params$use_phylo_dynamic
+  )
+  
+  # Train
+  result <- train_mditre(
+    model = model,
+    train_loader = train_loader,
+    val_loader = val_loader,
+    epochs = 200,
+    learning_rate = params$learning_rate,
+    early_stopping_patience = 30,
+    verbose = FALSE
+  )
+  
+  results[[i]] <- list(
+    params = params,
+    val_f1 = max(result$history$val_f1, na.rm = TRUE)
+  )
+}
+
+# Find best configuration
+best_idx <- which.max(sapply(results, function(r) r$val_f1))
+best_params <- results[[best_idx]]$params
+cat("Best hyperparameters:\n")
+print(best_params)
+```
+
+## Training Pipeline
+
+### Basic Training
+
+```{r eval = FALSE}
+# Train model with default settings
+result <- train_mditre(
+  model = model,
+  train_loader = train_loader,
+  val_loader = val_loader,
+  epochs = 200,
+  learning_rate = 0.001,
+  verbose = TRUE
+)
+
+# Access trained model
+trained_model <- result$model
+
+# Access training history
+history <- result$history
+```
+
+### Advanced Training Options
+
+```{r eval = FALSE}
+# Training with all options
+result <- train_mditre(
+  model = model,
+  train_loader = train_loader,
+  val_loader = val_loader,
+  
+  # Optimization
+  epochs = 300,
+  learning_rate = 0.001,
+  weight_decay = 0.0001,        # L2 regularization
+  optimizer_name = "rmsprop",    # or "adam", "sgd"
+  
+  # Early stopping
+  early_stopping_patience = 40,
+  early_stopping_metric = "f1", # Monitor F1 score
+  
+  # Checkpointing
+  checkpoint_dir = "checkpoints",
+  save_best_only = TRUE,        # Save only best model
+  
+  # Learning rate scheduling
+  lr_scheduler = "plateau",     # or "step", "exponential"
+  lr_patience = 15,             # For plateau scheduler
+  lr_factor = 0.5,              # Reduce LR by half
+  
+  # Loss function
+  class_weights = c(0.4, 0.6),  # Handle class imbalance
+  
+  # Logging
+  verbose = TRUE,
+  log_interval = 10             # Print every 10 epochs
+)
+```
+
+### Custom Training Loop
+
+```{r eval = FALSE}
+# Manual control over training
+model$train()
+optimizer <- optim_rmsprop(model$parameters, lr = 0.001)
+
+epochs <- 200
+history <- list(
+  train_loss = numeric(epochs),
+  val_loss = numeric(epochs),
+  val_f1 = numeric(epochs)
+)
+
+for (epoch in 1:epochs) {
+  # Training phase
+  train_loss <- 0
+  train_batches <- 0
+  
+  for (batch in train_loader) {
+    # Forward pass
+    output <- model(list(batch$abundance, batch$slopes))
+    loss <- nnf_cross_entropy(output, batch$labels)
+    
+    # Backward pass
+    optimizer$zero_grad()
+    loss$backward()
+    optimizer$step()
+    
+    train_loss <- train_loss + as.numeric(loss$cpu())
+    train_batches <- train_batches + 1
+  }
+  
+  history$train_loss[epoch] <- train_loss / train_batches
+  
+  # Validation phase
+  model$eval()
+  val_metrics <- evaluate_model_on_data(model, val_loader)
+  model$train()
+  
+  history$val_loss[epoch] <- val_metrics$metrics$loss
+  history$val_f1[epoch] <- val_metrics$metrics$f1
+  
+  if (epoch %% 10 == 0) {
+    cat(sprintf("Epoch %d/%d - Loss: %.4f - Val F1: %.4f\n",
+                epoch, epochs, 
+                history$train_loss[epoch],
+                history$val_f1[epoch]))
+  }
+}
+```
+
+## Optimization Strategies
+
+### Choosing an Optimizer
+
+```{r eval = FALSE}
+# RMSprop (recommended for most cases)
+optimizer_rms <- optim_rmsprop(
+  model$parameters,
+  lr = 0.001,
+  alpha = 0.99,
+  eps = 1e-8,
+  weight_decay = 0
+)
+
+# Adam (alternative)
+optimizer_adam <- optim_adam(
+  model$parameters,
+  lr = 0.001,
+  betas = c(0.9, 0.999),
+  eps = 1e-8,
+  weight_decay = 0
+)
+
+# SGD with momentum
+optimizer_sgd <- optim_sgd(
+  model$parameters,
+  lr = 0.01,
+  momentum = 0.9,
+  weight_decay = 0
+)
+```
+
+### Learning Rate Scheduling
+
+```{r eval = FALSE}
+# Reduce on plateau
+optimizer <- optim_rmsprop(model$parameters, lr = 0.001)
+scheduler <- lr_reduce_on_plateau(
+  optimizer,
+  mode = "max",          # Maximize F1 score
+  factor = 0.5,          # Reduce by half
+  patience = 15,         # Wait 15 epochs
+  min_lr = 1e-6
+)
+
+# In training loop:
+for (epoch in 1:epochs) {
+  # ... training code ...
+  
+  val_f1 <- evaluate_model(model, val_loader)$f1
+  scheduler$step(val_f1)  # Update learning rate
+}
+```
+
+```{r eval = FALSE}
+# Step decay
+scheduler_step <- lr_step(
+  optimizer,
+  step_size = 50,  # Every 50 epochs
+  gamma = 0.5      # Multiply by 0.5
+)
+
+# Exponential decay
+scheduler_exp <- lr_exponential(
+  optimizer,
+  gamma = 0.95  # Multiply by 0.95 each epoch
+)
+```
+
+### Regularization
+
+```{r eval = FALSE}
+# L2 regularization (weight decay)
+optimizer <- optim_rmsprop(
+  model$parameters,
+  lr = 0.001,
+  weight_decay = 0.0001  # L2 penalty
+)
+
+# Dropout (add to model if needed)
+# model$add_dropout(p = 0.2)
+
+# Early stopping (implicit regularization)
+result <- train_mditre(
+  model = model,
+  train_loader = train_loader,
+  val_loader = val_loader,
+  epochs = 300,
+  early_stopping_patience = 30  # Stop if no improvement
+)
+```
+
+## Handling Class Imbalance
+
+### Class Weights
+
+```{r eval = FALSE}
+# Calculate class frequencies
+label_counts <- table(mditre_data$labels)
+total <- sum(label_counts)
+class_weights <- total / (length(label_counts) * label_counts)
+
+cat("Class weights:\n")
+print(class_weights)
+
+# Use in training
+result <- train_mditre(
+  model = model,
+  train_loader = train_loader,
+  val_loader = val_loader,
+  epochs = 200,
+  class_weights = as.numeric(class_weights)
+)
+```
+
+### Oversampling/Undersampling
+
+```{r eval = FALSE}
+# Balance dataset by oversampling minority class
+balance_dataset <- function(data) {
+  labels <- data$labels
+  class_0 <- which(labels == 0)
+  class_1 <- which(labels == 1)
+  
+  # Oversample minority class
+  if (length(class_0) > length(class_1)) {
+    minority <- class_1
+    majority <- class_0
+  } else {
+    minority <- class_0
+    majority <- class_1
+  }
+  
+  # Sample with replacement
+  minority_oversampled <- sample(
+    minority,
+    length(majority),
+    replace = TRUE
+  )
+  
+  balanced_idx <- c(majority, minority_oversampled)
+  
+  # Create balanced dataset
+  list(
+    abundance = data$abundance[balanced_idx, , ],
+    slopes = data$slopes[balanced_idx, , ],
+    labels = data$labels[balanced_idx],
+    subjects = data$subjects[balanced_idx]
+  )
+}
+
+# Apply balancing
+balanced_train <- balance_dataset(train_data)
+balanced_loader <- create_dataloader(balanced_train, batch_size = 16)
+```
+
+## Model Checkpointing
+
+### Saving Checkpoints
+
+```{r eval = FALSE}
+# Manual checkpoint saving
+checkpoint_dir <- "checkpoints"
+dir.create(checkpoint_dir, showWarnings = FALSE)
+
+save_checkpoint <- function(model, optimizer, epoch, metrics, path) {
+  torch_save(
+    list(
+      model_state = model$state_dict(),
+      optimizer_state = optimizer$state_dict(),
+      epoch = epoch,
+      metrics = metrics
+    ),
+    path
+  )
+}
+
+# In training loop
+if (epoch %% 10 == 0) {
+  checkpoint_path <- file.path(
+    checkpoint_dir,
+    sprintf("checkpoint_epoch_%03d.pt", epoch)
+  )
+  save_checkpoint(model, optimizer, epoch, val_metrics, checkpoint_path)
+}
+```
+
+### Loading Checkpoints
+
+```{r eval = FALSE}
+# Load checkpoint
+load_checkpoint <- function(model, optimizer, path) {
+  checkpoint <- torch_load(path)
+  
+  model$load_state_dict(checkpoint$model_state)
+  optimizer$load_state_dict(checkpoint$optimizer_state)
+  
+  list(
+    epoch = checkpoint$epoch,
+    metrics = checkpoint$metrics
+  )
+}
+
+# Resume training
+checkpoint_info <- load_checkpoint(model, optimizer, "checkpoint.pt")
+start_epoch <- checkpoint_info$epoch + 1
+
+for (epoch in start_epoch:total_epochs) {
+  # ... continue training ...
+}
+```
+
+## Monitoring Training
+
+### Tracking Metrics
+
+```{r eval = FALSE}
+# Visualize training progress
+plot_training_history(
+  result$history,
+  metrics = c("loss", "f1", "accuracy")
+)
+
+# Check for overfitting
+train_f1 <- result$history$train_f1
+val_f1 <- result$history$val_f1
+gap <- train_f1 - val_f1
+
+if (any(gap > 0.1, na.rm = TRUE)) {
+  cat("Warning: Possible overfitting detected\n")
+  cat("Consider: reducing model complexity, adding regularization\n")
+}
+```
+
+### TensorBoard Integration (Optional)
+
+```{r eval = FALSE}
+# Log metrics for TensorBoard
+log_tensorboard <- function(writer, metrics, epoch) {
+  for (metric_name in names(metrics)) {
+    writer$add_scalar(metric_name, metrics[[metric_name]], epoch)
+  }
+}
+
+# In training loop:
+# writer <- torch::tensorboard_writer("logs")
+# log_tensorboard(writer, train_metrics, epoch)
+# writer$close()
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### NaN Loss
+
+```{r eval = FALSE}
+# Check for numerical instability
+if (is.nan(loss)) {
+  cat("NaN loss detected! Possible causes:\n")
+  cat("1. Learning rate too high - try reducing\n")
+  cat("2. Data not normalized - check preprocessing\n")
+  cat("3. Gradient explosion - add gradient clipping\n")
+}
+
+# Add gradient clipping
+optimizer <- optim_rmsprop(model$parameters, lr = 0.001)
+nn_utils_clip_grad_norm_(model$parameters, max_norm = 1.0)
+```
+
+#### Slow Convergence
+
+```{r eval = FALSE}
+# Increase learning rate
+result <- train_mditre(
+  model = model,
+  train_loader = train_loader,
+  val_loader = val_loader,
+  learning_rate = 0.01  # Increase from 0.001
+)
+
+# Or use warmup
+warmup_epochs <- 10
+for (epoch in 1:warmup_epochs) {
+  lr <- 0.001 * (epoch / warmup_epochs)
+  optimizer <- optim_rmsprop(model$parameters, lr = lr)
+  # ... training ...
+}
+```
+
+#### Poor Generalization
+
+```{r eval = FALSE}
+# Add regularization
+result <- train_mditre(
+  model = model,
+  train_loader = train_loader,
+  val_loader = val_loader,
+  weight_decay = 0.001,           # L2 regularization
+  early_stopping_patience = 20    # Early stopping
+)
+
+# Reduce model complexity
+model <- mditre_model(
+  num_rules = 3,  # Reduce from 5
+  # ... other params ...
+)
+```
+
+## Best Practices
+
+### General Guidelines
+
+1. **Start simple**: Begin with 3-5 rules, standard hyperparameters
+2. **Validate properly**: Always use validation set for hyperparameter selection
+3. **Monitor overfitting**: Watch train/validation gap
+4. **Set seeds**: Use `set_mditre_seeds()` for reproducibility
+5. **Save checkpoints**: Preserve best models during training
+6. **Use early stopping**: Prevent overfitting and save time
+
+### Recommended Workflow
+
+```{r eval = FALSE}
+# 1. Set seed
+set_mditre_seeds(42)
+
+# 2. Prepare data
+mditre_data <- phyloseq_to_mditre(ps, ...)
+split_data <- split_train_test(mditre_data, test_fraction = 0.2)
+train_loader <- create_dataloader(split_data$train, batch_size = 16)
+val_loader <- create_dataloader(split_data$test, batch_size = 16)
+
+# 3. Create model
+model <- mditre_model(num_rules = 5, ...)
+
+# 4. Train with monitoring
+result <- train_mditre(
+  model = model,
+  train_loader = train_loader,
+  val_loader = val_loader,
+  epochs = 200,
+  learning_rate = 0.001,
+  early_stopping_patience = 30,
+  checkpoint_dir = "checkpoints",
+  verbose = TRUE
+)
+
+# 5. Evaluate
+plot_training_history(result$history)
+eval_metrics <- evaluate_model_on_data(result$model, val_loader)
+print_metrics(eval_metrics$metrics)
+
+# 6. Save final model
+torch_save(result$model$state_dict(), "final_model.pt")
+```
+
+## Next Steps
+
+- See `vignette("evaluation")` for model evaluation
+- See `vignette("interpretation")` for rule interpretation
+- See examples in `examples/trainer_examples.R`
+
+## Session Info
+
+```{r}
+sessionInfo()
+```

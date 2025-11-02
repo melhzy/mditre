@@ -1,0 +1,517 @@
+---
+title: "R MDITRE Tutorial 2: Training on Real Data"
+author: "R MDITRE Package"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: show
+    theme: flatly
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Training MDITRE on Microbiome Data
+
+This tutorial demonstrates how to train MDITRE on real longitudinal microbiome data, evaluate performance, and interpret the learned rules.
+
+## Architecture
+
+**R MDITRE** provides an R interface to **Python MDITRE**:
+
+- **Frontend**: R 4.5.2 (data handling, visualization, R workflows)
+- **Backend**: Python MDITRE in MDITRE conda environment (PyTorch training)
+- **Bridge**: reticulate package (seamless R ↔ Python communication)
+
+This allows R users to leverage PyTorch's GPU acceleration and native performance while working in R.
+
+# Setup
+
+```{r libraries}
+library(reticulate)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)
+
+# Configure Python MDITRE backend (MDITRE conda environment)
+use_condaenv("MDITRE", required = TRUE)
+
+# Install Python MDITRE in development mode (ensures latest code)
+python_dir <- normalizePath(file.path(getwd(), "..", "..", "Python"), winslash = "/")
+if (dir.exists(python_dir)) {
+  system2("conda", args = c("run", "-n", "MDITRE", "pip", "install", "-e", python_dir), 
+          stdout = FALSE, stderr = FALSE)
+}
+
+# Import Python MDITRE modules
+torch_py <- import("torch")
+np <- import("numpy")
+mditre_models <- import("mditre.models")
+sklearn_metrics <- import("sklearn.metrics")
+
+device <- if (torch_py$cuda$is_available()) "cuda" else "cpu"
+
+cat("Training Environment:\n")
+cat("─────────────────────\n")
+cat("R:", R.version.string, "\n")
+cat("Python:", py_config()$version, "\n")
+cat("PyTorch:", torch_py$`__version__`, "\n")
+cat("mditre:", mditre_models$`__version__`, "\n")
+cat("Device:", device, "\n")
+if (device == "cuda") {
+  cat("GPU:", torch_py$cuda$get_device_name(0L), "\n")
+}
+```
+
+# Data Preparation
+
+## Generate Synthetic Longitudinal Data
+
+For this tutorial, we'll generate synthetic microbiome time-series data that mimics real longitudinal studies.
+
+```{r generate_data}
+set.seed(123)
+
+# Configuration
+n_subjects <- 100
+n_otus <- 50
+n_timepoints <- 10
+n_rules <- 5
+n_otu_centers <- 8
+emb_dim <- 15
+
+# Generate synthetic microbiome data
+# Each subject has OTU abundances measured over time
+generate_microbiome_data <- function(n_subjects, n_otus, n_timepoints) {
+  X <- array(0, dim = c(n_subjects, n_otus, n_timepoints))
+  
+  for (i in 1:n_subjects) {
+    for (t in 1:n_timepoints) {
+      # Dirichlet distribution for compositional data
+      alpha <- runif(n_otus, 0.5, 2.0)
+      abundances <- rgamma(n_otus, shape = alpha)
+      X[i, , t] <- abundances / sum(abundances)
+    }
+  }
+  
+  return(X)
+}
+
+X_data <- generate_microbiome_data(n_subjects, n_otus, n_timepoints)
+
+# Generate labels (e.g., disease progression)
+# Simulate signal: subjects with higher abundance of OTU 1 at early timepoints -> positive
+early_signal <- apply(X_data[, 1:5, 1:3], 1, mean)
+y_labels <- as.integer(early_signal > quantile(early_signal, 0.6))
+
+# Time masks (all subjects have complete time series in this example)
+X_mask <- array(1, dim = c(n_subjects, n_timepoints))
+
+cat(sprintf("✓ Generated data: %d subjects, %d OTUs, %d timepoints\n", 
+            n_subjects, n_otus, n_timepoints))
+cat(sprintf("  Positive samples: %d (%.1f%%)\n", 
+            sum(y_labels), 100 * mean(y_labels)))
+```
+
+## Train-Test Split
+
+```{r split_data}
+# Split into train (70%) and test (30%)
+n_train <- floor(0.7 * n_subjects)
+train_idx <- sample(1:n_subjects, n_train)
+test_idx <- setdiff(1:n_subjects, train_idx)
+
+X_train <- X_data[train_idx, , ]
+y_train <- y_labels[train_idx]
+mask_train <- X_mask[train_idx, ]
+
+X_test <- X_data[test_idx, , ]
+y_test <- y_labels[test_idx]
+mask_test <- X_mask[test_idx, ]
+
+cat(sprintf("Train set: %d samples (%.1f%% positive)\n", 
+            length(y_train), 100 * mean(y_train)))
+cat(sprintf("Test set: %d samples (%.1f%% positive)\n", 
+            length(y_test), 100 * mean(y_test)))
+```
+
+## Convert to PyTorch Tensors
+
+```{r to_tensors}
+# Convert to PyTorch tensors
+X_train_tensor <- torch_py$from_numpy(np$array(X_train))$float()$to(device)
+y_train_tensor <- torch_py$from_numpy(np$array(y_train))$float()$to(device)
+mask_train_tensor <- torch_py$from_numpy(np$array(mask_train))$float()$to(device)
+
+X_test_tensor <- torch_py$from_numpy(np$array(X_test))$float()$to(device)
+y_test_tensor <- torch_py$from_numpy(np$array(y_test))$float()$to(device)
+mask_test_tensor <- torch_py$from_numpy(np$array(mask_test))$float()$to(device)
+
+cat("✓ Data converted to PyTorch tensors\n")
+```
+
+# Model Creation
+
+## Initialize MDITRE Model
+
+```{r create_model}
+# Create OTU embeddings (phylogenetic space)
+set.seed(42)
+otu_embeddings <- matrix(rnorm(n_otus * emb_dim), n_otus, emb_dim)
+
+# Create MDITRE model
+model <- mditre_models$MDITRE(
+  num_rules = as.integer(n_rules),
+  num_otus = as.integer(n_otus),
+  num_otu_centers = as.integer(n_otu_centers),
+  num_time = as.integer(n_timepoints),
+  num_time_centers = 3L,
+  dist = otu_embeddings,
+  emb_dim = as.integer(emb_dim)
+)$to(device)
+
+# Initialize parameters
+init_args <- list(
+  kappa_init = np$array(matrix(runif(n_rules * n_otu_centers, 0.5, 2.0),
+                               n_rules, n_otu_centers)),
+  eta_init = np$array(array(rnorm(n_rules * n_otu_centers * emb_dim) * 0.1,
+                           dim = c(n_rules, n_otu_centers, emb_dim))),
+  abun_a_init = np$array(matrix(runif(n_rules * n_otu_centers, 0.2, 0.8),
+                               n_rules, n_otu_centers)),
+  abun_b_init = np$array(matrix(runif(n_rules * n_otu_centers, 0.2, 0.8),
+                               n_rules, n_otu_centers)),
+  slope_a_init = np$array(matrix(runif(n_rules * n_otu_centers, 0.2, 0.8),
+                                n_rules, n_otu_centers)),
+  slope_b_init = np$array(matrix(runif(n_rules * n_otu_centers, 0.2, 0.8),
+                                n_rules, n_otu_centers)),
+  thresh_init = np$array(matrix(runif(n_rules * n_otu_centers, 0.1, 0.5),
+                               n_rules, n_otu_centers)),
+  slope_init = np$array(matrix(runif(n_rules * n_otu_centers, -0.1, 0.1),
+                              n_rules, n_otu_centers)),
+  alpha_init = np$array(matrix(runif(n_rules * n_otu_centers, -1, 1),
+                              n_rules, n_otu_centers)),
+  w_init = np$array(matrix(rnorm(1 * n_rules) * 0.1, 1, n_rules)),
+  bias_init = np$array(c(0)),
+  beta_init = np$array(runif(n_rules, -1, 1))
+)
+
+model$init_params(init_args)
+
+cat("✓ Model created and initialized\n")
+cat(sprintf("  Rules: %d\n", n_rules))
+cat(sprintf("  OTU centers: %d\n", n_otu_centers))
+```
+
+# Training
+
+## Setup Optimizer and Loss
+
+```{r setup_training}
+# Binary cross-entropy loss
+criterion <- torch_py$nn$BCEWithLogitsLoss()
+
+# Adam optimizer
+optimizer <- torch_py$optim$Adam(model$parameters(), lr = 0.001)
+
+cat("✓ Optimizer and loss function ready\n")
+```
+
+## Training Loop
+
+```{r train_model}
+# Training configuration
+n_epochs <- 50
+batch_size <- 16L
+
+# Storage for metrics
+train_losses <- numeric(n_epochs)
+train_accs <- numeric(n_epochs)
+
+cat("Starting training...\n")
+cat(strrep("=", 60), "\n")
+
+for (epoch in 1:n_epochs) {
+  model$train()
+  
+  # Mini-batch training
+  n_batches <- ceiling(length(y_train) / batch_size)
+  epoch_loss <- 0
+  correct <- 0
+  total <- 0
+  
+  for (batch_idx in 1:n_batches) {
+    # Get batch indices
+    start_idx <- (batch_idx - 1) * batch_size + 1
+    end_idx <- min(batch_idx * batch_size, length(y_train))
+    batch_indices <- start_idx:end_idx
+    
+    # Get batch data
+    X_batch <- X_train_tensor$`__getitem__`(as.integer(batch_indices - 1))
+    y_batch <- y_train_tensor$`__getitem__`(as.integer(batch_indices - 1))
+    mask_batch <- mask_train_tensor$`__getitem__`(as.integer(batch_indices - 1))
+    
+    # Zero gradients
+    optimizer$zero_grad()
+    
+    # Forward pass
+    outputs <- model(X_batch, mask = mask_batch)
+    loss <- criterion(outputs, y_batch)
+    
+    # Backward pass
+    loss$backward()
+    optimizer$step()
+    
+    # Track metrics
+    epoch_loss <- epoch_loss + py_to_r(loss$item())
+    
+    predictions <- py_to_r((outputs > 0)$float()$cpu()$numpy())
+    correct <- correct + sum(predictions == y_train[batch_indices])
+    total <- total + length(batch_indices)
+  }
+  
+  # Calculate epoch metrics
+  avg_loss <- epoch_loss / n_batches
+  accuracy <- correct / total
+  
+  train_losses[epoch] <- avg_loss
+  train_accs[epoch] <- accuracy
+  
+  # Print progress
+  if (epoch %% 10 == 0 || epoch == 1) {
+    cat(sprintf("Epoch %2d/%d | Loss: %.4f | Acc: %.3f\n", 
+                epoch, n_epochs, avg_loss, accuracy))
+  }
+}
+
+cat(strrep("=", 60), "\n")
+cat("✓ Training complete\n")
+```
+
+## Visualize Training Progress
+
+```{r plot_training}
+# Create training history dataframe
+history_df <- data.frame(
+  Epoch = 1:n_epochs,
+  Loss = train_losses,
+  Accuracy = train_accs
+)
+
+# Plot loss
+p1 <- ggplot(history_df, aes(x = Epoch, y = Loss)) +
+  geom_line(color = "#3498DB", size = 1) +
+  geom_point(color = "#2C3E50", size = 2) +
+  labs(title = "Training Loss", y = "BCE Loss") +
+  theme_minimal()
+
+# Plot accuracy
+p2 <- ggplot(history_df, aes(x = Epoch, y = Accuracy)) +
+  geom_line(color = "#E74C3C", size = 1) +
+  geom_point(color = "#2C3E50", size = 2) +
+  labs(title = "Training Accuracy", y = "Accuracy") +
+  theme_minimal()
+
+# Combine plots
+p1 + p2 + plot_annotation(
+  title = "MDITRE Training Progress",
+  theme = theme(plot.title = element_text(face = "bold", size = 14))
+)
+```
+
+# Evaluation
+
+## Test Set Performance
+
+```{r evaluate}
+# Set model to evaluation mode
+model$eval()
+
+# Predict on test set
+with(torch_py$no_grad(), {
+  test_outputs <- model(X_test_tensor, mask = mask_test_tensor)
+  test_probs <- torch_py$sigmoid(test_outputs)
+})
+
+# Convert to R
+test_probs_r <- py_to_r(test_probs$cpu()$numpy())
+test_preds_r <- as.integer(test_probs_r > 0.5)
+
+# Calculate metrics
+accuracy <- mean(test_preds_r == y_test)
+f1 <- py_to_r(sklearn_metrics$f1_score(y_test, test_preds_r))
+auc <- py_to_r(sklearn_metrics$roc_auc_score(y_test, test_probs_r))
+
+cat("\nTest Set Performance:\n")
+cat(strrep("=", 40), "\n")
+cat(sprintf("Accuracy: %.3f\n", accuracy))
+cat(sprintf("F1 Score: %.3f\n", f1))
+cat(sprintf("AUC-ROC:  %.3f\n", auc))
+cat(strrep("=", 40), "\n")
+```
+
+## Confusion Matrix
+
+```{r confusion_matrix}
+# Create confusion matrix
+cm <- table(Predicted = test_preds_r, Actual = y_test)
+
+# Convert to dataframe for plotting
+cm_df <- as.data.frame(cm)
+
+# Plot
+ggplot(cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
+  geom_tile(color = "white", size = 1) +
+  geom_text(aes(label = Freq), size = 12, fontface = "bold") +
+  scale_fill_gradient(low = "#ECF0F1", high = "#3498DB") +
+  labs(
+    title = "Confusion Matrix - Test Set",
+    x = "Actual Label",
+    y = "Predicted Label"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "none"
+  )
+```
+
+## ROC Curve
+
+```{r roc_curve}
+# Calculate ROC curve
+fpr <- sklearn_metrics$roc_curve(y_test, test_probs_r)[[1]]
+tpr <- sklearn_metrics$roc_curve(y_test, test_probs_r)[[2]]
+
+roc_df <- data.frame(
+  FPR = py_to_r(fpr),
+  TPR = py_to_r(tpr)
+)
+
+# Plot ROC
+ggplot(roc_df, aes(x = FPR, y = TPR)) +
+  geom_line(color = "#E74C3C", size = 1.5) +
+  geom_abline(linetype = "dashed", color = "gray50") +
+  annotate("text", x = 0.7, y = 0.3, 
+           label = sprintf("AUC = %.3f", auc),
+           size = 5, fontface = "bold") +
+  labs(
+    title = "ROC Curve - MDITRE Model",
+    x = "False Positive Rate",
+    y = "True Positive Rate"
+  ) +
+  coord_equal() +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14)
+  )
+```
+
+# Learned Rules Interpretation
+
+## Extract Rule Weights
+
+```{r extract_rules}
+# Get final layer weights
+state_dict <- model$state_dict()
+
+# Rule importance (from final layer weights)
+w_final <- py_to_r(state_dict$`layer5.fc.weight`$cpu()$numpy())
+rule_importance <- abs(w_final[1, ])
+
+# Create rule dataframe
+rules_df <- data.frame(
+  Rule = paste0("Rule ", 1:n_rules),
+  Importance = rule_importance
+) %>%
+  arrange(desc(Importance))
+
+# Plot rule importance
+ggplot(rules_df, aes(x = reorder(Rule, Importance), y = Importance)) +
+  geom_col(fill = "#9B59B6", alpha = 0.8) +
+  coord_flip() +
+  labs(
+    title = "Learned Rule Importance",
+    subtitle = "Contribution to final classification decision",
+    x = "Rule",
+    y = "Absolute Weight"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14)
+  )
+```
+
+## Temporal Focus Analysis
+
+```{r temporal_focus}
+# Extract temporal parameters for top rule
+top_rule_idx <- which.max(rule_importance) - 1  # 0-indexed for Python
+
+# Get temporal window parameters (abun_a, abun_b for abundance focus)
+abun_a <- py_to_r(state_dict$`layer2.abun_a`$cpu()$numpy())[top_rule_idx + 1, ]
+abun_b <- py_to_r(state_dict$`layer2.abun_b`$cpu()$numpy())[top_rule_idx + 1, ]
+
+# Create visualization of temporal attention
+time_points <- 1:n_timepoints
+
+# Simulate temporal window (simplified)
+temporal_weights <- numeric(n_timepoints)
+for (t in time_points) {
+  t_norm <- (t - 1) / (n_timepoints - 1)
+  # Weighted combination based on learned parameters
+  temporal_weights[t] <- mean(exp(-((t_norm - abun_a)^2) / (2 * abun_b^2)))
+}
+
+# Normalize
+temporal_weights <- temporal_weights / sum(temporal_weights)
+
+temporal_df <- data.frame(
+  Timepoint = time_points,
+  Weight = temporal_weights
+)
+
+ggplot(temporal_df, aes(x = Timepoint, y = Weight)) +
+  geom_line(color = "#16A085", size = 1.5) +
+  geom_area(fill = "#16A085", alpha = 0.3) +
+  labs(
+    title = paste("Temporal Focus -", rules_df$Rule[1]),
+    subtitle = "Learned importance of each timepoint",
+    x = "Timepoint",
+    y = "Attention Weight"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14)
+  )
+```
+
+# Summary
+
+This tutorial demonstrated:
+
+1. ✅ Generating synthetic longitudinal microbiome data
+2. ✅ Training MDITRE model with gradient descent
+3. ✅ Evaluating model performance (accuracy, F1, AUC)
+4. ✅ Visualizing training progress and results
+5. ✅ Interpreting learned rules and temporal patterns
+
+## Key Results
+
+- **Test Accuracy**: `r sprintf("%.1f%%", 100 * accuracy)`
+- **F1 Score**: `r sprintf("%.3f", f1)`
+- **AUC-ROC**: `r sprintf("%.3f", auc)`
+
+## Next Steps
+
+- **Tutorial 3**: Advanced interpretation techniques
+- **Tutorial 4**: Cross-validation and hyperparameter tuning
+- **Tutorial 5**: Working with real 16S rRNA sequencing data
+
+---
+
+**R MDITRE Package** | Training Tutorial | November 2025

@@ -1,0 +1,159 @@
+url: https://melhzy.github.io/mditre/
+
+template:
+  bootstrap: 5
+  bootswatch: cosmo
+  theme: arrow-light
+  
+home:
+  title: "MDITRE: Microbiome Interpretable Temporal Rule Engine"
+  description: >
+    MDITRE is an R package for predicting disease outcomes from longitudinal 
+    microbiome data using interpretable neural network rules.
+
+authors:
+  footer:
+    roles: [cre, aut]
+    text: "Developed by the MDITRE Team"
+
+navbar:
+  structure:
+    left:  [intro, reference, articles, tutorials, news]
+    right: [search, github, twitter]
+  components:
+    home:
+      icon: fas fa-home fa-lg
+      href: index.html
+    reference:
+      text: Reference
+      href: reference/index.html
+    articles:
+      text: Articles
+      menu:
+      - text: Quickstart Guide
+        href: articles/quickstart.html
+      - text: Training Guide
+        href: articles/training.html
+      - text: Evaluation Guide
+        href: articles/evaluation.html
+      - text: Interpretation Guide
+        href: articles/interpretation.html
+    news:
+      text: Changelog
+      href: news/index.html
+    github:
+      icon: fab fa-github fa-lg
+      href: https://github.com/melhzy/mditre
+      aria-label: GitHub
+
+reference:
+- title: "Model Construction"
+  desc: "Complete MDITRE models"
+  contents:
+  - mditre_model
+  - mditre_abun_model
+
+- title: "Neural Network Layers"
+  desc: "Individual layer components"
+  contents:
+  - starts_with("spatial_agg")
+  - starts_with("time_agg")
+  - starts_with("threshold_detector")
+  - starts_with("slope_detector")
+  - starts_with("rules_")
+  - starts_with("dense_layer")
+
+- title: "Data Loading and Preprocessing"
+  desc: "phyloseq integration and data handling"
+  contents:
+  - phyloseq_to_mditre
+  - split_train_test
+  - create_dataloader
+  - print_mditre_data_summary
+
+- title: "Model Training"
+  desc: "Training pipeline and utilities"
+  contents:
+  - train_mditre
+  - print_training_metrics
+
+- title: "Model Evaluation"
+  desc: "Performance metrics and validation"
+  contents:
+  - compute_metrics
+  - compute_roc_curve
+  - evaluate_model_on_data
+  - cross_validate_mditre
+  - compare_models
+  - print_metrics
+
+- title: "Visualization"
+  desc: "Publication-quality plots"
+  contents:
+  - plot_training_history
+  - plot_roc_curve
+  - plot_confusion_matrix
+  - plot_cv_results
+  - plot_model_comparison
+  - plot_phylogenetic_tree
+  - plot_parameter_distributions
+  - create_evaluation_report
+
+- title: "Mathematical Utilities"
+  desc: "Core mathematical operations"
+  contents:
+  - binary_concrete
+  - unitboxcar
+  - soft_and
+  - soft_or
+  - transf_log
+  - inv_transf_log
+
+- title: "Reproducibility"
+  desc: "Seeding and random number generation"
+  contents:
+  - set_mditre_seeds
+  - generate_seed
+  - seed_generator
+  - seedhash_available
+  - get_seed_info
+
+- title: "Architecture and Registry"
+  desc: "Base classes and layer registration"
+  contents:
+  - base_layer
+  - layer_registry
+  - get_registered_layers
+
+articles:
+- title: "Getting Started"
+  navbar: ~
+  contents:
+  - quickstart
+  
+- title: "User Guides"
+  navbar: ~
+  contents:
+  - training
+  - evaluation
+  - interpretation
+
+footer:
+  structure:
+    left: developed_by
+    right: built_with
+  components:
+    developed_by: |
+      MDITRE is developed by [the MDITRE team](https://github.com/melhzy/mditre/graphs/contributors).
+    built_with: |
+      Built with [pkgdown](https://pkgdown.r-lib.org/) and [R](https://www.r-project.org/).
+
+development:
+  mode: auto
+  version_label: default
+  version_tooltip: "Version"
+
+news:
+  releases:
+  - text: "Version 2.0.0"
+    href: https://github.com/melhzy/mditre/releases/tag/v2.0.0
