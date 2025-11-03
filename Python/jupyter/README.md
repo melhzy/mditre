@@ -2,6 +2,24 @@
 
 This folder contains all Jupyter notebook-related content for the MDITRE project.
 
+## 🌐 Open in Google Colab
+
+All notebooks are now fully compatible with Google Colab! Click the badges below to launch:
+
+### Quick Start
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melhzy/mditre/blob/master/Python/jupyter/run_mditre_test.ipynb) **run_mditre_test.ipynb** - Quick training & validation
+
+### Tutorials
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melhzy/mditre/blob/master/Python/jupyter/tutorials/Tutorial_1_16s_data.ipynb) **Tutorial 1** - 16S Data (David et al.)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melhzy/mditre/blob/master/Python/jupyter/tutorials/Tutorial_2_metaphlan_data.ipynb) **Tutorial 2** - Metaphlan Data (Kostic et al.)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melhzy/mditre/blob/master/Python/jupyter/tutorials/Tutorial_Bokulich_16S_data.ipynb) **Tutorial 3** - Bokulich 16S Data
+
+> 💡 **Colab Setup**: Run cell #2 in each notebook to install packages and mount Google Drive. See [`COLAB_BADGES.md`](COLAB_BADGES.md) for detailed instructions.
+
+---
+
 ## Contents
 
 ### Main Notebook
