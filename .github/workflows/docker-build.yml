@@ -1,0 +1,88 @@
+name: Docker Build and Test
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  docker-build:
+    name: Build and Test Docker Images
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        target: [base, with-r]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image (${{ matrix.target }})
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          tags: mditre:${{ matrix.target }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+      
+      - name: Test Python environment
+        if: matrix.target == 'base'
+        run: |
+          docker run --rm mditre:base python --version
+          docker run --rm mditre:base python -c "import mditre; print(f'MDITRE {mditre.__version__}')"
+          docker run --rm mditre:base python -c "import torch; print(f'PyTorch {torch.__version__}')"
+      
+      - name: Run Python tests
+        if: matrix.target == 'base'
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace mditre:base \
+            pytest /workspace/Python/tests/test_all.py -v --tb=short
+      
+      - name: Test R environment
+        if: matrix.target == 'with-r'
+        run: |
+          docker run --rm mditre:with-r R --version
+          docker run --rm mditre:with-r Rscript -e "packageVersion('reticulate')"
+      
+      - name: Run cross-platform verification
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/workspace mditre:${{ matrix.target }} \
+            python /workspace/scripts/verify_cross_platform.py
+      
+      - name: Check image size
+        run: |
+          docker images mditre:${{ matrix.target }} --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+  
+  docker-compose-test:
+    name: Test Docker Compose
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Test docker-compose configuration
+        run: |
+          docker-compose config
+      
+      - name: Build Python service
+        run: |
+          docker-compose build mditre-python
+      
+      - name: Test Python service
+        run: |
+          docker-compose run --rm mditre-python python --version
+          docker-compose run --rm mditre-python pytest Python/tests/test_all.py -v
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          docker-compose down -v
