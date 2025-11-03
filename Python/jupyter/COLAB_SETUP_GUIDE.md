@@ -7,16 +7,16 @@
 
 ## Quick Start
 
-All MDITRE Jupyter notebooks are fully compatible with Google Colab. Each tutorial notebook includes setup cells that automatically:
-- Installs the MDITRE package from the Python subdirectory
-- Provides instructions for obtaining dataset files
-- Configures the appropriate matplotlib backend
+All MDITRE Jupyter notebooks are fully compatible with Google Colab. Tutorial notebooks automatically:
+- Install the MDITRE package from the Python subdirectory
+- Download complete dataset files from Google Drive (using `gdown`)
+- Configure the appropriate matplotlib backend
 
-**For tutorials: Run cell #2 to get started!**
+**For tutorials: Run cells #2 and #3 to get started!**
 - Cell #2: Package installation and environment setup
-- Cell #3: Dataset file instructions and availability check
+- Cell #3: Automatic dataset download from Google Drive (~30 seconds)
 
-**Note:** Tutorial datasets are not hosted on GitHub due to size. See cell #3 in each tutorial for dataset access options.
+**All datasets download automatically** - no manual file management needed!
 
 ---
 
@@ -75,24 +75,35 @@ print("✅ MDITRE installed\n")
 
 **Problem:** Tutorial dataset files are too large to host on GitHub and are excluded from the repository.
 
-**Solution Options:**
+**Solution: Automatic Download from Google Drive ✅**
 
-**Option 1: Upload to Google Drive (Recommended for Colab)**
-1. Download the dataset from the original source (links provided in each tutorial)
-2. Upload files to Google Drive at `/MyDrive/mditre_data/<dataset_name>/`
-3. Mount Drive in Colab and update file paths
+All tutorial notebooks now include automatic dataset download from Google Drive using `gdown`:
 
-**Option 2: Use Pre-processed Data**
-- The repository includes pre-processed pickle files in `mditre_paper_results/datasets/`
-- These skip the preprocessing step and allow jumping directly to model training
-- Good for learning model architecture and training
+```python
+# Automatically downloads all datasets (raw/ and processed/ folders)
+!pip install -q gdown
+!gdown --folder 1UHUrDXzuoIbZ1NsHc3WJn3p6-NMTQSMu -O ./datasets --quiet
+```
+
+**What's Downloaded:**
+- Complete `raw/` folder with all tutorial datasets (david, t1d, bokulich, etc.)
+- Pre-processed `processed/` folder with pickle files
+- All config files and metadata
+
+**No manual setup required** - just run cell #3 in any tutorial!
+
+**Alternative Options:**
+
+**Option 2: Use Pre-processed Data Only**
+- Pre-processed pickle files are included in the download
+- Skip the preprocessing step
+- Jump directly to model training
 
 **Option 3: Run Locally**
-- Clone the full repository with dataset files
-- Run notebooks in local Jupyter environment
-- Dataset files are available in local copies for collaborators
+- Clone the repository
+- Dataset files available in local copy for collaborators
 
-**For Learning Without Datasets:**
+**For Learning Without External Datasets:**
 - `run_mditre_test.ipynb` - Uses synthetic data (no external files needed)
 - `five_layer_architecture_demo.ipynb` - Demonstrates architecture (no external files needed)
 
