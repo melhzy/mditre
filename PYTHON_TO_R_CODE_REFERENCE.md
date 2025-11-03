@@ -1,7 +1,7 @@
 # MDITRE: Python to R Code Translation Reference
 
 **Companion to**: PYTHON_TO_R_CONVERSION_GUIDE.md  
-**Version**: 1.0.0  
+**Version**: 1.0.1  
 **Date**: November 1, 2025
 
 This document provides side-by-side code translations for key MDITRE components.
@@ -1116,5 +1116,5 @@ This reference provides direct Python-to-R translations for MDITRE's core compon
 
 ---
 
-**Document Version**: 1.0.0  
+**Document Version**: 1.0.1  
 **Last Updated**: November 1, 2025

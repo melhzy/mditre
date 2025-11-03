@@ -1,8 +1,8 @@
 Package: mditre
 Type: Package
 Title: Microbial Dynamics Interpretable Transformer-based Rule Engine
-Version: 2.0.0
-Date: 2025-11-01
+Version: 1.0.1
+Date: 2025-11-02
 Authors@R: c(
     person("MDITRE", "Development Team", role = c("aut", "cre"),
            email = "mditre@example.com")

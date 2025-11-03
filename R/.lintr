@@ -1,0 +1,45 @@
+# R Linting Configuration for MDITRE
+# lintr configuration file
+
+linters: linters_with_defaults(
+  # Line length (match Python's 100)
+  line_length_linter = line_length_linter(100),
+  
+  # Disable some opinionated linters
+  object_name_linter = NULL,  # Allow snake_case (not camelCase)
+  cyclocomp_linter = cyclocomp_linter(15),  # Match flake8 complexity
+  
+  # Enable useful linters
+  assignment_linter = assignment_linter(),
+  closed_curly_linter = closed_curly_linter(),
+  commas_linter = commas_linter(),
+  commented_code_linter = NULL,  # Allow commented code in examples
+  equals_na_linter = equals_na_linter(),
+  function_left_parentheses_linter = function_left_parentheses_linter(),
+  infix_spaces_linter = infix_spaces_linter(),
+  line_length_linter = line_length_linter(100),
+  no_tab_linter = no_tab_linter(),
+  object_length_linter = object_length_linter(30),
+  object_usage_linter = object_usage_linter(),
+  open_curly_linter = open_curly_linter(),
+  paren_brace_linter = paren_brace_linter(),
+  semicolon_terminator_linter = semicolon_terminator_linter(),
+  seq_linter = seq_linter(),
+  spaces_inside_linter = spaces_inside_linter(),
+  spaces_left_parentheses_linter = spaces_left_parentheses_linter(),
+  T_and_F_symbol_linter = T_and_F_symbol_linter(),
+  trailing_blank_lines_linter = trailing_blank_lines_linter(),
+  trailing_whitespace_linter = trailing_whitespace_linter(),
+  unneeded_concatenation_linter = unneeded_concatenation_linter()
+)
+
+# Exclude patterns
+exclusions: list(
+  "inst/doc",
+  "man",
+  "tests/testthat.R",
+  "vignettes"
+)
+
+# Encoding
+encoding: "UTF-8"

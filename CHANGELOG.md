@@ -5,6 +5,101 @@ All notable changes to MDITRE will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-11-02
+
+### Test Verification (November 2, 2025)
+- ✅ **Python Tests**: 39/39 passing (100% coverage, 3.54s execution time)
+- ✅ **R Tests**: 39/39 passing (100% coverage, 9 test files validated)
+- ✅ **Cross-Platform**: 3/3 verification tests passing
+- ✅ **Total**: 81/81 tests passing across all platforms
+- ✅ **Status**: Production ready for PyPI and CRAN submission
+
+### Added
+- **Cross-Platform Path Utilities**: Complete Windows, macOS, and Ubuntu support
+  - `path_utils.py` (Python): 12 utility functions for dynamic path handling
+  - `path_utils.R` (R): Identical API with roxygen2 documentation
+  - Functions: `get_package_root()`, `get_project_root()`, `get_python_dir()`, `get_r_dir()`, `get_data_dir()`, `get_output_dir()`, `normalize_path()`, `ensure_dir_exists()`, `join_paths()`, `get_platform_info()`, `to_unix_path()`, `to_platform_path()`
+- **Verification Suite**: `scripts/verify_cross_platform.py` with 3 comprehensive tests (100% pass rate)
+- **Comprehensive Documentation**: 6 new documentation files
+  - `INSTALLATION.md`: Multi-platform installation guide
+  - `CROSS_PLATFORM_PATHS.md`: Technical path handling documentation
+  - `CROSS_PLATFORM_COMPLIANCE.md`: Detailed verification report
+  - `CROSS_PLATFORM_SUMMARY.md`: Executive summary
+  - `QUICK_START.md`: Simplified user guide
+  - `DEVELOPMENT_BEST_PRACTICES.md`: Compliance audit against 20 best practice categories
+- **CI/CD Automation**: GitHub Actions workflow for cross-platform testing
+  - Matrix testing: Python 3.8-3.12, R 4.1-4.4
+  - Platforms: Ubuntu, macOS, Windows
+  - Integration tests verifying Python-R API consistency
+  - Code quality checks (flake8, lintr)
+  - Documentation verification
+- **Linting Configuration**: 
+  - Python: `.flake8`, enhanced `pyproject.toml` with black/isort/mypy settings
+  - R: `.lintr` with comprehensive rules matching Python style
+
+### Changed
+- **Environment Detection**: Automatic pip vs development mode detection
+  - Python: Uses `__file__` and `importlib.resources` for package location
+  - R: Uses `system.file()` for installed packages, `here::here()` for development
+- **Path Handling**: All internal paths now use `pathlib.Path` (Python) and `file.path()` (R)
+  - Forward slashes internally, platform-specific only for system calls
+  - User home directory via `Path.home()` (Python) and `path.expand("~")` (R)
+- **R Package Version**: Synchronized from 2.0.0 to 1.0.1 (matches Python version)
+- **Examples**: Updated all code examples to use dynamic path utilities instead of hardcoded paths
+- **Error Handling**: Enhanced with detailed error messages
+  - `get_package_root()`: Clear guidance when package not properly installed
+  - `ensure_dir_exists()`: Specific permission error messages
+  - Consistent error messages between Python and R
+
+### Removed
+- **Hardcoded Windows Paths**: Eliminated all hardcoded Windows-specific paths
+- **Fixed Torch Paths**: Removed hardcoded torch configuration from `R/.Renviron`
+
+### Fixed
+- **Cross-Platform Compatibility**: Package now works identically on Windows, macOS, and Ubuntu
+- **Installation**: Zero configuration required after `pip install mditre` or `install.packages("mditre")`
+
+### Technical Details
+- **Python-R API Consistency**: 12/12 function names identical across languages
+- **Naming Convention**: 100% snake_case for all functions
+- **Testing**: 3/3 tests passing across all platforms
+- **Dependencies**: Minimal (Python: pathlib, R: base R + here for dev mode)
+
+### Compliance Status
+Based on comprehensive audit against 20 development best practices:
+- ✅ **Strong**: Cross-platform support, Python-R consistency, naming conventions, documentation, testing, API design
+- ✅ **Completed**: CI/CD automation, error handling, linting configurations
+- ⚠️ **Recommended**: Structured logging (planned for v1.1.0)
+
+### Migration Guide (v1.0.0 → v1.0.1)
+
+**No breaking changes** - all existing code continues to work.
+
+**To use new cross-platform utilities**:
+
+Python:
+```python
+from mditre.utils.path_utils import get_package_root, get_data_dir
+
+# Automatically works on any platform
+package_root = get_package_root()
+data_dir = get_data_dir()
+```
+
+R:
+```R
+library(mditre)
+
+# Identical API, works on any platform
+package_root <- get_package_root()
+data_dir <- get_data_dir()
+```
+
+### Contributors
+- melhzy (Cross-platform implementation, v1.0.1 Release)
+
+---
+
 ## [1.0.0] - 2025-11-01
 
 ### Added

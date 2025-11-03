@@ -1,0 +1,56 @@
+[flake8]
+# Maximum line length
+max-line-length = 100
+
+# Ignore specific rules
+ignore = 
+    E203,  # Whitespace before ':' (conflicts with black)
+    E501,  # Line too long (handled by black)
+    W503,  # Line break before binary operator (conflicts with black)
+    E266,  # Too many leading '#' for block comment
+    E402,  # Module level import not at top of file
+
+# Exclude directories
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    env,
+    build,
+    dist,
+    *.egg-info,
+    .pytest_cache,
+    .mypy_cache,
+    docs,
+    tutorials,
+    mditre_paper_results
+
+# Files to check
+filename = 
+    *.py
+
+# Show source code for each error
+show-source = True
+
+# Show error statistics
+statistics = True
+
+# Count errors
+count = True
+
+# Select errors and warnings to enforce
+select = 
+    E,    # All E errors
+    W,    # All W warnings
+    F,    # All F errors (pyflakes)
+    C90,  # McCabe complexity
+
+# Maximum cyclomatic complexity
+max-complexity = 15
+
+# Per-file ignores
+per-file-ignores =
+    __init__.py:F401,F403
+    */tests/*:E501,F401,F841
+    */tutorials/*:E402,E501
