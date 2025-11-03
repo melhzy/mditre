@@ -1,4 +1,4 @@
-# MDITRE Data Loader Module
+﻿# MDITRE Data Loader Module
 
 A modular, extensible data loading system for microbiome time-series data supporting multiple sequencing formats and preprocessing pipelines.
 
@@ -534,6 +534,6 @@ If you use MDITRE data loader module, please cite the MDITRE paper:
 ## Support
 
 For questions or issues:
-- GitHub Issues: https://github.com/gerberlab/mditre/issues
+- GitHub Issues: https://github.com/melhzy/mditre/issues
 - Documentation: See `DATA_LOADER_GUIDE.md`
 - Examples: See `examples/data_loader_example.py`

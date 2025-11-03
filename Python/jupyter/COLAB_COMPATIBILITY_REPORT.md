@@ -1,4 +1,4 @@
-# Google Colab Compatibility Report
+﻿# Google Colab Compatibility Report
 **Generated**: November 3, 2025  
 **Repository**: mditre (Python/jupyter notebooks)
 
@@ -110,7 +110,7 @@ All notebooks use standard imports that work in Colab:
 Add installation cell:
 ```python
 # Install MDITRE package
-!pip install git+https://github.com/gerberlab/mditre.git
+!pip install git+https://github.com/melhzy/mditre.git
 ```
 
 ---
@@ -168,7 +168,7 @@ try:
     
     # Install MDITRE package
     print("\n📦 Installing MDITRE package...")
-    !pip install -q git+https://github.com/gerberlab/mditre.git
+    !pip install -q git+https://github.com/melhzy/mditre.git
     
     # Mount Google Drive (for accessing data files)
     print("\n💾 Mounting Google Drive...")
@@ -257,4 +257,4 @@ In Colab (using `%matplotlib inline`), visualization becomes:
 
 - [Google Colab FAQ](https://research.google.com/colaboratory/faq.html)
 - [Matplotlib Backends](https://matplotlib.org/stable/users/explain/backends.html)
-- [MDITRE Documentation](https://github.com/gerberlab/mditre)
+- [MDITRE Documentation](https://github.com/melhzy/mditre)

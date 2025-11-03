@@ -1,4 +1,4 @@
-# Google Colab Compatibility Fixes Applied ✅
+﻿# Google Colab Compatibility Fixes Applied ✅
 
 **Date**: November 3, 2025  
 **Status**: All fixes successfully applied
@@ -111,7 +111,7 @@ try:
     
     # Install MDITRE package
     print("📦 Installing MDITRE package...")
-    !pip install -q git+https://github.com/gerberlab/mditre.git
+    !pip install -q git+https://github.com/melhzy/mditre.git
     print("✅ MDITRE installed\n")
     
     # Mount Google Drive

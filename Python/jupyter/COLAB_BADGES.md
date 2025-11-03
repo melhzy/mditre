@@ -1,4 +1,4 @@
-# Open in Google Colab - Quick Links
+﻿# Open in Google Colab - Quick Links
 
 Click the badges below to open notebooks directly in Google Colab:
 
@@ -57,7 +57,7 @@ Tutorials require data files. You have two options:
 **Option B: Download in Colab**
 ```python
 # Example: Download data directly in Colab
-!wget https://raw.githubusercontent.com/gerberlab/mditre/master/path/to/data.csv
+!wget https://raw.githubusercontent.com/melhzy/mditre/master/path/to/data.csv
 ```
 
 ---
@@ -78,7 +78,7 @@ All notebooks are now fully compatible with Google Colab:
 
 - **Compatibility Report**: See `COLAB_COMPATIBILITY_REPORT.md` for technical details
 - **Implementation Summary**: See `COLAB_FIXES_APPLIED.md` for changes made
-- **Main README**: [github.com/gerberlab/mditre](https://github.com/gerberlab/mditre)
+- **Main README**: [github.com/melhzy/mditre](https://github.com/melhzy/mditre)
 
 ---
 
