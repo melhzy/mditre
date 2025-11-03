@@ -7,15 +7,12 @@ test_that("SpatialAgg initializes correctly", {
   dist_matrix <- matrix(runif(num_otus * num_otus), num_otus, num_otus)
   dist_matrix <- (dist_matrix + t(dist_matrix)) / 2
   diag(dist_matrix) <- 0
-  dist <- torch_tensor(dist_matrix)
   
-  layer <- spatial_agg(num_rules, num_otus, dist)
+  layer <- spatial_agg_layer(num_rules, num_otus, dist_matrix)
   
-  # Check parameters exist
+  # Check parameters exist (only kappa, not eta - that's in SpatialAggDynamic)
   expect_true(!is.null(layer$kappa))
-  expect_true(!is.null(layer$eta))
   expect_equal(as.numeric(layer$kappa$shape), c(num_rules, num_otus))
-  expect_equal(as.numeric(layer$eta$shape), c(num_rules, num_otus))
 })
 
 test_that("SpatialAgg forward pass works", {
@@ -29,18 +26,17 @@ test_that("SpatialAgg forward pass works", {
   dist_matrix <- matrix(runif(num_otus * num_otus), num_otus, num_otus)
   dist_matrix <- (dist_matrix + t(dist_matrix)) / 2
   diag(dist_matrix) <- 0
-  dist <- torch_tensor(dist_matrix)
   
-  layer <- spatial_agg(num_rules, num_otus, dist)
+  layer <- spatial_agg_layer(num_rules, num_otus, dist_matrix)
   
   # Create input
   x <- torch_rand(batch_size, num_otus, num_time)
   
-  # Forward pass
-  output <- layer(x, temp = 0.5)
+  # Forward pass (use k instead of temp)
+  output <- layer(x, k = 0.5)
   
-  # Check output shape
-  expect_equal(as.numeric(output$shape), c(batch_size, num_rules, num_time))
+  # Check output shape (includes num_otus dimension)
+  expect_equal(as.numeric(output$shape), c(batch_size, num_rules, num_otus, num_time))
 })
 
 test_that("SpatialAgg output is in valid range", {
@@ -53,12 +49,11 @@ test_that("SpatialAgg output is in valid range", {
   dist_matrix <- matrix(runif(num_otus * num_otus), num_otus, num_otus)
   dist_matrix <- (dist_matrix + t(dist_matrix)) / 2
   diag(dist_matrix) <- 0
-  dist <- torch_tensor(dist_matrix)
   
-  layer <- spatial_agg(num_rules, num_otus, dist)
+  layer <- spatial_agg_layer(num_rules, num_otus, dist_matrix)
   x <- torch_rand(batch_size, num_otus, num_time)
   
-  output <- layer(x, temp = 0.5)
+  output <- layer(x, k = 0.5)
   values <- as.numeric(output$cpu())
   
   # Output should be non-negative (weighted sum of abundances)
@@ -74,34 +69,34 @@ test_that("SpatialAgg is differentiable", {
   dist_matrix <- matrix(runif(num_otus * num_otus), num_otus, num_otus)
   dist_matrix <- (dist_matrix + t(dist_matrix)) / 2
   diag(dist_matrix) <- 0
-  dist <- torch_tensor(dist_matrix)
   
-  layer <- spatial_agg(num_rules, num_otus, dist)
+  layer <- spatial_agg_layer(num_rules, num_otus, dist_matrix)
   x <- torch_rand(2, num_otus, num_time, requires_grad = TRUE)
   
-  output <- layer(x, temp = 0.5)
+  output <- layer(x, k = 0.5)
   loss <- output$sum()
   loss$backward()
   
-  # Gradients should exist
+  # Gradients should exist (only kappa, not eta - that's in SpatialAggDynamic)
   expect_false(is.null(x$grad))
   expect_false(is.null(layer$kappa$grad))
-  expect_false(is.null(layer$eta$grad))
 })
 
 test_that("SpatialAggDynamic initializes correctly", {
   num_rules <- 3
   num_otus <- 50
-  dist_matrix <- matrix(runif(num_otus * num_otus), num_otus, num_otus)
-  dist_matrix <- (dist_matrix + t(dist_matrix)) / 2
-  diag(dist_matrix) <- 0
-  dist <- torch_tensor(dist_matrix)
+  num_otu_centers <- 5
+  emb_dim <- 10
   
-  layer <- spatial_agg_dynamic(num_rules, num_otus, dist)
+  # Create OTU embeddings
+  otu_embeddings <- matrix(rnorm(num_otus * emb_dim), nrow = num_otus, ncol = emb_dim)
+  
+  layer <- spatial_agg_dynamic_layer(num_rules, num_otu_centers, otu_embeddings, emb_dim, num_otus)
   
   # Check parameters exist
   expect_true(!is.null(layer$kappa))
   expect_true(!is.null(layer$eta))
+  expect_equal(as.numeric(layer$eta$shape), c(num_rules, num_otu_centers, emb_dim))
 })
 
 test_that("SpatialAggDynamic forward pass works", {
@@ -109,24 +104,23 @@ test_that("SpatialAggDynamic forward pass works", {
   batch_size <- 4
   num_rules <- 3
   num_otus <- 50
+  num_otu_centers <- 5
+  emb_dim <- 10
   num_time <- 5
   
-  dist_matrix <- matrix(runif(num_otus * num_otus), num_otus, num_otus)
-  dist_matrix <- (dist_matrix + t(dist_matrix)) / 2
-  diag(dist_matrix) <- 0
-  dist <- torch_tensor(dist_matrix)
+  # Create OTU embeddings
+  otu_embeddings <- matrix(rnorm(num_otus * emb_dim), nrow = num_otus, ncol = emb_dim)
   
-  layer <- spatial_agg_dynamic(num_rules, num_otus, dist)
+  layer <- spatial_agg_dynamic_layer(num_rules, num_otu_centers, otu_embeddings, emb_dim, num_otus)
   
-  # Create input with slopes
+  # Create input
   x <- torch_rand(batch_size, num_otus, num_time)
-  slopes <- torch_randn(batch_size, num_otus, num_time)
   
-  # Forward pass
-  output <- layer(list(x, slopes), temp = 0.5)
+  # Forward pass (use k instead of temp)
+  output <- layer(x, k = 0.5)
   
-  # Check output shape
-  expect_equal(as.numeric(output$shape), c(batch_size, num_rules, num_time))
+  # Check output shape (includes num_otu_centers dimension)
+  expect_equal(as.numeric(output$shape), c(batch_size, num_rules, num_otu_centers, num_time))
 })
 
 test_that("phylogenetic distance affects aggregation", {
@@ -140,9 +134,8 @@ test_that("phylogenetic distance affects aggregation", {
   dist_matrix[1:5, 1:5] <- 0.1  # Close group 1
   dist_matrix[6:10, 6:10] <- 0.1  # Close group 2
   diag(dist_matrix) <- 0
-  dist <- torch_tensor(dist_matrix)
   
-  layer <- spatial_agg(num_rules, num_otus, dist)
+  layer <- spatial_agg_layer(num_rules, num_otus, dist_matrix)
   
   # Initialize kappa to select first OTU strongly
   with_no_grad({
@@ -154,7 +147,7 @@ test_that("phylogenetic distance affects aggregation", {
   x <- torch_zeros(1, num_otus, num_time)
   x[1, 1:5, ] <- 1.0
   
-  output <- layer(x, temp = 0.1)
+  output <- layer(x, k = 0.1)
   
   # Output should be positive (aggregating first group)
   expect_true(as.numeric(output$mean()$cpu()) > 0.1)
