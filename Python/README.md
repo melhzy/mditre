@@ -5,7 +5,7 @@
 
 ## Overview
 
-This directory contains the complete Python implementation of MDITRE (Microbial Dynamics Interpretable Transformer-based Rule Engine).
+This directory contains the complete Python implementation of MDITRE (Microbiome Differentiable Interpretable Temporal Rule Engine).
 
 ## Directory Structure
 

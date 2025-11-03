@@ -6,7 +6,7 @@
 
 ## Overview
 
-R interface to MDITRE (Microbial Dynamics Interpretable Transformer-based Rule Engine), a deep learning framework for analyzing longitudinal microbiome time-series data.
+R interface to MDITRE (Microbiome Differentiable Interpretable Temporal Rule Engine), a deep learning framework for analyzing longitudinal microbiome time-series data.
 
 **Architecture**: R MDITRE is an R package that bridges to Python MDITRE via reticulate, providing native R workflows while using the Python PyTorch backend for computation.
 

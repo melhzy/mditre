@@ -1,5 +1,5 @@
 """
-MDITRE: Microbiome DynamIc Time-series Rule Extraction
+MDITRE: Microbiome Differentiable Interpretable Temporal Rule Engine
 
 A deep learning framework for extracting interpretable rules from longitudinal
 microbiome data for disease prediction and biological understanding.

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mditre"
 version = "1.0.1"
-description = "MDITRE: Scalable and Interpretable Machine Learning for Predicting Host Status from Temporal Microbiome Dynamics"
+description = "MDITRE: Microbiome Differentiable Interpretable Temporal Rule Engine - Scalable ML for Temporal Microbiome Dynamics"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "GPL-3.0"}

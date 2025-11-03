@@ -15,7 +15,7 @@ def read_readme():
 setup(
     name="mditre",
     version="1.0.1",
-    description="MDITRE: Scalable and Interpretable Machine Learning for Predicting Host Status from Temporal Microbiome Dynamics",
+    description="MDITRE: Microbiome Differentiable Interpretable Temporal Rule Engine - Scalable ML for Temporal Microbiome Dynamics",
     long_description=read_readme(),
     long_description_content_type="text/markdown",
     url="https://github.com/melhzy/mditre",

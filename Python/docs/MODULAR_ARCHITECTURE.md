@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the new modular architecture for MDITRE (Microbiome DynamIc Time-series Rule Extraction). The codebase has been refactored from a monolithic structure into a clean, 5-layer modular design that mirrors the biological and mathematical structure described in the publication (Maringanti et al. 2022).
+This document describes the new modular architecture for MDITRE (Microbiome Differentiable Interpretable Temporal Rule Engine). The codebase has been refactored from a monolithic structure into a clean, 5-layer modular design that mirrors the biological and mathematical structure described in the publication (Maringanti et al. 2022).
 
 ## Architecture Layers
 

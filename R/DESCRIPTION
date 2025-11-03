@@ -1,6 +1,6 @@
 Package: mditre
 Type: Package
-Title: Microbial Dynamics Interpretable Transformer-based Rule Engine
+Title: Microbiome Differentiable Interpretable Temporal Rule Engine
 Version: 1.0.1
 Date: 2025-11-02
 Authors@R: c(
