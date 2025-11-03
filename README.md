@@ -511,7 +511,7 @@ Python/mditre/
 ```
 
 **Design Benefits:**
-- ✅ **Multi-Language**: Python (current) + R (planned)
+- ✅ **Multi-Language**: Python (current) + R (current)
 - ✅ **Extensible**: Add new layers via registry pattern
 - ✅ **Interpretable**: Each layer has biological meaning
 - ✅ **Flexible**: Mix and match implementations
