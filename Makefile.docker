@@ -1,0 +1,91 @@
+# Makefile for MDITRE Docker Operations
+# Simplifies common Docker tasks
+
+.PHONY: help docker-build docker-run docker-test docker-jupyter docker-clean docker-shell
+
+# Default target
+help:
+	@echo "MDITRE Docker Commands"
+	@echo "======================"
+	@echo ""
+	@echo "Build Commands:"
+	@echo "  make docker-build-python   - Build Python-only image"
+	@echo "  make docker-build-full     - Build full image with R"
+	@echo "  make docker-build-all      - Build all images"
+	@echo ""
+	@echo "Run Commands:"
+	@echo "  make docker-shell-python   - Start Python container shell"
+	@echo "  make docker-shell-full     - Start full container shell"
+	@echo "  make docker-jupyter        - Start Jupyter Lab (port 8888)"
+	@echo ""
+	@echo "Test Commands:"
+	@echo "  make docker-test-python    - Run Python tests in container"
+	@echo "  make docker-test-all       - Run all tests"
+	@echo "  make docker-verify         - Run cross-platform verification"
+	@echo ""
+	@echo "Utility Commands:"
+	@echo "  make docker-ps             - Show running containers"
+	@echo "  make docker-stop           - Stop all containers"
+	@echo "  make docker-clean          - Remove containers"
+	@echo "  make docker-clean-all      - Remove containers and images"
+	@echo "  make docker-gpu-check      - Check GPU availability"
+	@echo ""
+
+# Build commands
+docker-build-python:
+	docker-compose build mditre-python
+
+docker-build-full:
+	docker-compose build mditre-full
+
+docker-build-all:
+	docker-compose build
+
+# Shell access
+docker-shell-python:
+	docker-compose run --rm mditre-python bash
+
+docker-shell-full:
+	docker-compose run --rm mditre-full bash
+
+# Jupyter Lab
+docker-jupyter:
+	@echo "Starting Jupyter Lab..."
+	@echo "Access at: http://localhost:8888"
+	docker-compose up mditre-jupyter
+
+# Test commands
+docker-test-python:
+	docker-compose run --rm mditre-python pytest Python/tests/test_all.py -v
+
+docker-test-all:
+	docker-compose run --rm mditre-python pytest Python/tests/test_all.py -v
+	@echo ""
+	@echo "Running cross-platform verification..."
+	docker-compose run --rm mditre-python python scripts/verify_cross_platform.py
+
+docker-verify:
+	docker-compose run --rm mditre-python python scripts/verify_cross_platform.py
+
+# Utility commands
+docker-ps:
+	docker-compose ps
+
+docker-stop:
+	docker-compose down
+
+docker-clean:
+	docker-compose down -v
+
+docker-clean-all:
+	docker-compose down -v --rmi all
+	@echo "All containers, volumes, and images removed"
+
+docker-gpu-check:
+	docker-compose run --rm mditre-python python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"None\"}')"
+
+# Quick start
+docker-quickstart: docker-build-python docker-test-python
+	@echo ""
+	@echo "✅ Docker environment ready!"
+	@echo "Run 'make docker-shell-python' to start working"

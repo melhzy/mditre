@@ -1,9 +1,9 @@
 # MDITRE Installation Guide
 
 **Version**: 1.0.1  
-**Last Updated**: November 2, 2025  
-**Test Status**: ✅ 81/81 tests passing (Python: 39/39, R: 39/39, Cross-Platform: 3/3)  
-**Supported Platforms**: Windows, macOS, Linux/Ubuntu
+**Last Updated**: November 3, 2025  
+**Test Status**: ✅ 39/39 Python tests passing (100%)  
+**Supported Platforms**: Windows, macOS, Linux/Ubuntu, **Docker** 🐳
 
 ---
 
@@ -11,9 +11,45 @@
 
 MDITRE v1.0.1 is designed for **zero-configuration cross-platform installation**. After installing via `pip install mditre` (Python) or `install.packages("mditre")` (R), the package works immediately on Windows, macOS, and Ubuntu without any manual path configuration or edits.
 
-**Verified Performance**: Python test suite completes in 3.54 seconds with 100% pass rate.
+**NEW**: Docker support for guaranteed reproducibility and zero version conflicts! 🎉
+
+**Verified Performance**: Python test suite completes in 3.31 seconds with 100% pass rate.
 
 ## Installation Methods
+
+### 🐳 Docker Installation (Recommended)
+
+**Best for**: Reproducible environments, avoiding version conflicts, quick setup
+
+```bash
+# Clone repository
+git clone https://github.com/melhzy/mditre.git
+cd mditre
+
+# Option A: Python-only environment (lightweight)
+docker-compose up -d mditre-python
+docker exec -it mditre-python bash
+cd /workspace/Python && pytest tests/test_all.py -v
+
+# Option B: Full environment with R support
+docker-compose up -d mditre-full
+docker exec -it mditre-full bash
+
+# Option C: Jupyter Lab for interactive development
+docker-compose up -d mditre-jupyter
+# Access at http://localhost:8888
+```
+
+**Advantages**:
+- ✅ No version conflicts (Python 3.12.3, R 4.5.2, PyTorch 2.5.1)
+- ✅ Consistent across all platforms
+- ✅ GPU support included (CUDA 12.4)
+- ✅ All dependencies pre-installed
+- ✅ Isolated from system packages
+
+See [DOCKER.md](DOCKER.md) for complete documentation.
+
+---
 
 ### Python Installation
 

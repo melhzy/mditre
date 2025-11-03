@@ -1,0 +1,94 @@
+# Docker Compose configuration for MDITRE
+# Provides Python-only and Python+R configurations
+
+services:
+  # Python-only MDITRE environment
+  mditre-python:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: base
+    image: mditre:python
+    container_name: mditre-python
+    volumes:
+      - .:/workspace
+      - mditre-data:/data
+    working_dir: /workspace
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+
+  # Full MDITRE environment with R support
+  mditre-full:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: with-r
+    image: mditre:full
+    container_name: mditre-full
+    volumes:
+      - .:/workspace
+      - mditre-data:/data
+    working_dir: /workspace
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CUDA_VISIBLE_DEVICES=0
+      - R_LIBS_USER=/usr/local/lib/R/site-library
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+
+  # JupyterLab environment for interactive development
+  mditre-jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: with-r
+    image: mditre:jupyter
+    container_name: mditre-jupyter
+    volumes:
+      - .:/workspace
+      - mditre-data:/data
+    working_dir: /workspace
+    ports:
+      - "8888:8888"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CUDA_VISIBLE_DEVICES=0
+      - JUPYTER_ENABLE_LAB=yes
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      jupyter lab
+      --ip=0.0.0.0
+      --port=8888
+      --no-browser
+      --allow-root
+      --NotebookApp.token=''
+      --NotebookApp.password=''
+
+volumes:
+  mditre-data:
+    driver: local

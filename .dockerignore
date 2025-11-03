@@ -1,0 +1,85 @@
+# Docker ignore file for MDITRE
+# Excludes unnecessary files from Docker build context
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# R
+.Rhistory
+.RData
+.Rproj.user
+*.Rproj
+
+# Jupyter
+.ipynb_checkpoints
+*.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Documentation build
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# Output directories
+mditre_outputs/
+*.pth
+*.pkl
+*.h5
+
+# Data files (large)
+*.csv
+*.tsv
+*.fasta
+*.fastq
+*.bam
+*.sam
+
+# Temporary files
+tmp/
+temp/
+*.tmp

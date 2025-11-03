@@ -76,11 +76,16 @@ See language-specific documentation in [`Python/`](Python/) and [`R/`](R/) direc
 - ⚡ **GPU Acceleration**: Full CUDA support for high-performance computing on large datasets
 - 🌐 **Dual Language**: Native Python and R implementations with identical functionality
 - 📦 **Modern Infrastructure**: Type hints, comprehensive documentation, CI/CD ready
+- 🐳 **Docker Support**: Reproducible environments with zero version conflicts
 
 ## 📚 Table of Contents
 
 - [Installation](#installation)
+  - [Docker Installation (Recommended)](#quick-install)
+  - [Python Installation](#quick-install)
+  - [R Installation](#quick-install)
 - [Quick Start](#quick-start)
+- [Docker Guide](#docker-guide)
 - [Architecture](#architecture)
 - [Data Loading](#data-loading)
 - [Training Models](#training-models)
@@ -110,7 +115,34 @@ See language-specific documentation in [`Python/`](Python/) and [`R/`](R/) direc
 
 ### Quick Install
 
-#### Option 1: Python Only (Standalone)
+#### Option 1: Docker (Recommended - No Version Conflicts) 🐳
+
+**Fastest and most reliable way to get started!**
+
+```bash
+# Clone the repository
+git clone https://github.com/melhzy/mditre.git
+cd mditre
+
+# Python-only environment
+docker-compose up -d mditre-python
+docker exec -it mditre-python bash
+
+# OR: Full environment with R support
+docker-compose up -d mditre-full
+docker exec -it mditre-full bash
+
+# OR: Jupyter Lab for interactive analysis
+docker-compose up -d mditre-jupyter
+# Access at http://localhost:8888
+
+# Run tests inside container
+pytest Python/tests/test_all.py -v
+```
+
+See [DOCKER.md](DOCKER.md) for complete Docker documentation.
+
+#### Option 2: Python Only (Standalone)
 
 ```bash
 # Clone the repository
@@ -130,7 +162,7 @@ pip install -r requirements-dev.txt
 make install-dev
 ```
 
-#### Option 2: R with Python Backend (Recommended for R Users)
+#### Option 3: R with Python Backend (Recommended for R Users)
 
 ```r
 # Step 1: Install Python MDITRE backend first (see above)
@@ -220,6 +252,67 @@ pip install -e .
 ```python
 python -c "import mditre; import torch; print(f'MDITRE installed. PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
 ```
+
+---
+
+## 🐳 Docker Guide
+
+**Docker provides the most reliable installation method with zero version conflicts.**
+
+### Quick Start with Docker
+
+```bash
+# Clone repository
+git clone https://github.com/melhzy/mditre.git
+cd mditre
+
+# Start Python-only environment
+docker-compose up -d mditre-python
+docker exec -it mditre-python bash
+
+# Run tests inside container
+cd /workspace/Python
+pytest tests/test_all.py -v
+```
+
+### Available Docker Services
+
+| Service | Description | Command |
+|---------|-------------|---------|
+| `mditre-python` | Python-only (lightweight ~5GB) | `docker-compose up -d mditre-python` |
+| `mditre-full` | Python + R support (~7GB) | `docker-compose up -d mditre-full` |
+| `mditre-jupyter` | Jupyter Lab on port 8888 | `docker-compose up -d mditre-jupyter` |
+
+### Environment Specifications
+
+- **Ubuntu**: 24.04 LTS
+- **Python**: 3.12.3
+- **R**: 4.5.2
+- **PyTorch**: 2.5.1 with CUDA 12.4
+- **GPU**: NVIDIA GPU support included
+
+### Common Docker Commands
+
+```bash
+# Run Python tests
+docker-compose run --rm mditre-python pytest Python/tests/test_all.py -v
+
+# Interactive Python shell
+docker-compose run --rm mditre-python python
+
+# Interactive R shell (full image)
+docker-compose run --rm mditre-full R
+
+# Stop all containers
+docker-compose down
+
+# Rebuild after changes
+docker-compose build mditre-python
+```
+
+**📖 Complete Docker documentation**: See [DOCKER.md](DOCKER.md) for advanced usage, troubleshooting, and GPU configuration.
+
+---
 
 ### 🌐 Cross-Platform Support
 
