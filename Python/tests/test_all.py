@@ -898,7 +898,7 @@ class TestSection12_1_PyTorchIntegration:
 
 
     @pytest.mark.integration
-    def test_12_1_3_model_serialization(self, test_config, otu_embeddings, device, tmp_path):
+    def test_12_1_3_model_serialization(self, test_config, otu_embeddings, init_args_full, device, tmp_path):
         """Test model save/load."""
         model = MDITRE(
             num_rules=test_config['num_rules'],
@@ -909,6 +909,9 @@ class TestSection12_1_PyTorchIntegration:
             dist=otu_embeddings,
             emb_dim=test_config['emb_dim']
         ).to(device)
+        
+        # Initialize model parameters to avoid NaN values
+        model.init_params(init_args_full)
         
         save_path = tmp_path / "test_model.pth"
         torch.save(model.state_dict(), save_path)
