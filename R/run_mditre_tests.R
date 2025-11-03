@@ -1105,12 +1105,10 @@ run_test("Reproducible forward pass", function() {
     emb_dim = test_config$emb_dim
   )$to(device)
   
-  # Initialize both models with same parameters (using seeded rnorm for reproducibility)
-  set.seed(test_seed)
+  # Initialize both models with same parameters (use fixed values for reproducibility)
   init_args <- list(
     kappa_init = np$array(matrix(0.5, test_config$num_rules, test_config$num_otu_centers)),
-    eta_init = np$array(array(rnorm(test_config$num_rules * test_config$num_otu_centers * test_config$emb_dim, 0, 0.1),
-                             dim = c(test_config$num_rules, test_config$num_otu_centers, test_config$emb_dim))),
+    eta_init = np$array(array(0.1, dim = c(test_config$num_rules, test_config$num_otu_centers, test_config$emb_dim))),
     abun_a_init = np$array(matrix(0.5, test_config$num_rules, test_config$num_otu_centers)),
     abun_b_init = np$array(matrix(0.5, test_config$num_rules, test_config$num_otu_centers)),
     slope_a_init = np$array(matrix(0.5, test_config$num_rules, test_config$num_otu_centers)),
@@ -1125,6 +1123,8 @@ run_test("Reproducible forward pass", function() {
   model1$init_params(init_args)
   model2$init_params(init_args)
   
+  # Seed PyTorch RNG before creating input for reproducibility
+  torch_py$manual_seed(as.integer(test_seed))
   X <- torch_py$randn(1L, test_config$num_otus, test_config$num_time)$to(device)
   
   with(torch_py$no_grad(), {
@@ -1132,7 +1132,17 @@ run_test("Reproducible forward pass", function() {
     out2 <- model2(X)
     
     # Outputs should be identical with same seed (use relaxed tolerance for floating point)
-    diff <- py_to_r(torch_py$abs(out1 - out2)$max()$cpu())
+    diff <- as.numeric(py_to_r(torch_py$abs(out1 - out2)$max()$item()))
+    
+    # Debug: print actual difference if test fails
+    if (diff >= 1e-4) {
+      cat(sprintf("\nDEBUG Test 31: Actual difference = %.10f (threshold = 1e-4)\n", diff))
+      out1_vals <- as.numeric(py_to_r(out1$cpu()$numpy()))
+      out2_vals <- as.numeric(py_to_r(out2$cpu()$numpy()))
+      cat(sprintf("out1: %s\n", paste(out1_vals, collapse=", ")))
+      cat(sprintf("out2: %s\n", paste(out2_vals, collapse=", ")))
+    }
+    
     expect_true(diff < 1e-4)
   })
 }, "")
