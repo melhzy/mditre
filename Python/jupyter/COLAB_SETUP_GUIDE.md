@@ -9,12 +9,14 @@
 
 All MDITRE Jupyter notebooks are fully compatible with Google Colab. Each tutorial notebook includes setup cells that automatically:
 - Installs the MDITRE package from the Python subdirectory
-- Downloads required dataset files from GitHub
+- Provides instructions for obtaining dataset files
 - Configures the appropriate matplotlib backend
 
-**For tutorials: Run cells #2 and #3 to get started!**
+**For tutorials: Run cell #2 to get started!**
 - Cell #2: Package installation and environment setup
-- Cell #3: Automatic dataset download (tutorials only)
+- Cell #3: Dataset file instructions and availability check
+
+**Note:** Tutorial datasets are not hosted on GitHub due to size. See cell #3 in each tutorial for dataset access options.
 
 ---
 
@@ -69,35 +71,30 @@ print("📦 Installing MDITRE package...")
 print("✅ MDITRE installed\n")
 ```
 
-### Issue 3: File Access
+### Issue 3: Dataset Files
 
-**Problem:** Data files located in local directory structure won't be accessible in Colab.
+**Problem:** Tutorial dataset files are too large to host on GitHub and are excluded from the repository.
 
-**Solution:** Automatic dataset download from GitHub:
+**Solution Options:**
 
-All tutorial notebooks now include an automatic dataset download cell (right after the Colab setup cell) that downloads the required data files directly from GitHub. This eliminates the need to manually upload files or configure Google Drive paths.
+**Option 1: Upload to Google Drive (Recommended for Colab)**
+1. Download the dataset from the original source (links provided in each tutorial)
+2. Upload files to Google Drive at `/MyDrive/mditre_data/<dataset_name>/`
+3. Mount Drive in Colab and update file paths
 
-```python
-# Download dataset files (for Colab users)
-if IN_COLAB:
-    import os
-    import urllib.request
-    
-    # Create directory structure and download files
-    os.makedirs('./datasets/raw/david', exist_ok=True)
-    base_url = "https://raw.githubusercontent.com/melhzy/mditre/master/Python/jupyter/tutorials/datasets/raw/david/"
-    
-    # Downloads all required files automatically
-    for filename in files:
-        urllib.request.urlretrieve(base_url + filename, f'./datasets/raw/david/{filename}')
-```
+**Option 2: Use Pre-processed Data**
+- The repository includes pre-processed pickle files in `mditre_paper_results/datasets/`
+- These skip the preprocessing step and allow jumping directly to model training
+- Good for learning model architecture and training
 
-**Alternative:** Mount Google Drive if you prefer to use your own data files:
+**Option 3: Run Locally**
+- Clone the full repository with dataset files
+- Run notebooks in local Jupyter environment
+- Dataset files are available in local copies for collaborators
 
-```python
-from google.colab import drive
-drive.mount('/content/drive')
-```
+**For Learning Without Datasets:**
+- `run_mditre_test.ipynb` - Uses synthetic data (no external files needed)
+- `five_layer_architecture_demo.ipynb` - Demonstrates architecture (no external files needed)
 
 ---
 
