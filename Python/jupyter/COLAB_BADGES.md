@@ -27,6 +27,13 @@ Click the badges below to open notebooks directly in Google Colab:
 
 ---
 
+## 🧠 Architecture Deep Dive
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melhzy/mditre/blob/master/neural_network/five_layer_architecture_demo.ipynb)
+**`five_layer_architecture_demo.ipynb`** - Interactive demonstration of MDITRE's 5-layer neural network architecture
+
+---
+
 ## 💡 Usage Instructions
 
 ### First Time Setup (in Colab):

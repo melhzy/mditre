@@ -12,6 +12,24 @@
 **Last Tested**: November 2, 2025  
 **Test Status**: ✅ 42/42 tests passing (100% coverage)  
 
+## 🚀 Quick Start with Google Colab
+
+Run MDITRE notebooks directly in your browser - no installation required!
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melhzy/mditre/blob/master/Python/jupyter/run_mditre_test.ipynb) **Quick Start** - Train & validate MDITRE in 5 minutes
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melhzy/mditre/blob/master/Python/jupyter/tutorials/Tutorial_1_16s_data.ipynb) **Tutorial 1** - 16S amplicon data analysis
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melhzy/mditre/blob/master/Python/jupyter/tutorials/Tutorial_2_metaphlan_data.ipynb) **Tutorial 2** - Shotgun metagenomics data
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melhzy/mditre/blob/master/Python/jupyter/tutorials/Tutorial_Bokulich_16S_data.ipynb) **Tutorial 3** - Complete workflow with DADA2
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melhzy/mditre/blob/master/neural_network/five_layer_architecture_demo.ipynb) **Architecture Demo** - Interactive 5-layer neural network deep dive
+
+> 💡 **First time?** Click any badge above → Run cell #2 to install → Enable GPU runtime → Execute remaining cells. See [Jupyter Notebooks Guide](Python/jupyter/) for details.
+
+---
+
 ## 🌍 Multi-Language Support
 
 MDITRE supports both Python and R programming languages with full feature parity:
