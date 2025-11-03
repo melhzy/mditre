@@ -424,7 +424,7 @@ Planned support for additional formats:
 
 ## References
 
-- MDITRE Paper: Maringanti et al. (2022), mSystems 7:e00132-22
+- MDITRE Paper: Maringanti, Veda Sheersh, Bucci, Vanni, and Gerber, Georg K. (2022). "MDITRE: Scalable and Interpretable Machine Learning for Predicting Host Status from Temporal Microbiome Dynamics." mSystems 7(3):e00132-22. https://doi.org/10.1128/msystems.00132-22
 - Repository: https://github.com/melhzy/mditre
 - Documentation: See MODULAR_ARCHITECTURE.md for layer details
 

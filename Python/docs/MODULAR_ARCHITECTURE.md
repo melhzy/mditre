@@ -300,7 +300,7 @@ The original test suite in `test_mditre_comprehensive.py` validates the complete
 
 ## References
 
-- Maringanti, V., et al. (2022). "MDITRE: automated extraction of ready-to-use rules from longitudinal microbiome data." *mSystems* 7(1), e00132-22.
+- Maringanti, Veda Sheersh, Bucci, Vanni, and Gerber, Georg K. (2022). "MDITRE: Scalable and Interpretable Machine Learning for Predicting Host Status from Temporal Microbiome Dynamics." *mSystems* 7(3), e00132-22. https://doi.org/10.1128/msystems.00132-22
 - GitHub Repository: https://github.com/melhzy/mditre
 
 ## Support

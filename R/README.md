@@ -540,7 +540,7 @@ Contributions welcome! See [../CONTRIBUTING.md](../CONTRIBUTING.md) for guidelin
 
 ## References
 
-- Maringanti, S., et al. (2022). "MDITRE: Fast Interpretable Greedy Multi-Scale Smoothing of Time-Series for Classifiers," mSystems.
+- Maringanti, Veda Sheersh, Bucci, Vanni, and Gerber, Georg K. (2022). "MDITRE: Scalable and Interpretable Machine Learning for Predicting Host Status from Temporal Microbiome Dynamics." mSystems 7(3):e00132-22. https://doi.org/10.1128/msystems.00132-22
 - Python implementation: `../Python/`
 - Conversion guides: `../PYTHON_TO_R_CONVERSION_GUIDE.md`, `../PYTHON_TO_R_CODE_REFERENCE.md`
 
