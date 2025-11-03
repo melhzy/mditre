@@ -56,14 +56,14 @@ else:
 
 ### Issue 2: Package Installation
 
-**Problem:** MDITRE package needs to be installed before use.
+**Problem:** MDITRE package needs to be installed before use. The Python package is located in the `Python/` subdirectory of the repository.
 
-**Solution:** Automatic installation in Colab setup cell:
+**Solution:** Automatic installation in Colab setup cell with subdirectory specification:
 
 ```python
-# Install MDITRE package
+# Install MDITRE package from Python subdirectory
 print("📦 Installing MDITRE package...")
-!pip install -q git+https://github.com/melhzy/mditre.git
+!pip install -q git+https://github.com/melhzy/mditre.git#subdirectory=Python
 print("✅ MDITRE installed\n")
 ```
 
@@ -100,9 +100,9 @@ try:
     IN_COLAB = True
     print("✅ Running in Google Colab\n")
     
-    # Install MDITRE package
+    # Install MDITRE package from Python subdirectory
     print("📦 Installing MDITRE package...")
-    !pip install -q git+https://github.com/melhzy/mditre.git
+    !pip install -q git+https://github.com/melhzy/mditre.git#subdirectory=Python
     print("✅ MDITRE installed\n")
     
     # Mount Google Drive
