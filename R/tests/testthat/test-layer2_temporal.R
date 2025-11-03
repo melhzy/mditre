@@ -6,7 +6,7 @@ test_that("TimeAgg initializes correctly", {
   num_time <- 5
   times <- 1:num_time
   
-  layer <- time_agg(num_rules, num_time, times)
+  layer <- time_agg_layer(num_rules, num_time, times)
   
   # Check parameters exist
   expect_true(!is.null(layer$mu))
@@ -22,7 +22,7 @@ test_that("TimeAgg forward pass works", {
   num_time <- 5
   times <- 1:num_time
   
-  layer <- time_agg(num_rules, num_time, times)
+  layer <- time_agg_layer(num_rules, num_time, times)
   
   # Create input (abundance and slopes)
   x_abun <- torch_rand(batch_size, num_rules, num_time)
@@ -46,7 +46,7 @@ test_that("TimeAgg focuses on specific time windows", {
   num_time <- 10
   times <- 1:num_time
   
-  layer <- time_agg(num_rules, num_time, times)
+  layer <- time_agg_layer(num_rules, num_time, times)
   
   # Set mu to focus on middle timepoints
   with_no_grad({
@@ -72,7 +72,7 @@ test_that("TimeAgg is differentiable", {
   num_time <- 5
   times <- 1:num_time
   
-  layer <- time_agg(num_rules, num_time, times)
+  layer <- time_agg_layer(num_rules, num_time, times)
   
   x_abun <- torch_rand(batch_size, num_rules, num_time, requires_grad = TRUE)
   x_slope <- torch_randn(batch_size, num_rules, num_time, requires_grad = TRUE)
@@ -92,7 +92,7 @@ test_that("TimeAggAbun initializes correctly", {
   num_time <- 5
   times <- 1:num_time
   
-  layer <- time_agg_abun(num_rules, num_time, times)
+  layer <- time_agg_abun_layer(num_rules, num_time, times)
   
   # Check parameters exist
   expect_true(!is.null(layer$mu))
@@ -106,7 +106,7 @@ test_that("TimeAggAbun forward pass works", {
   num_time <- 5
   times <- 1:num_time
   
-  layer <- time_agg_abun(num_rules, num_time, times)
+  layer <- time_agg_abun_layer(num_rules, num_time, times)
   
   # Create input (abundance only)
   x <- torch_rand(batch_size, num_rules, num_time)
@@ -126,7 +126,7 @@ test_that("TimeAggAbun handles missing timepoints", {
   num_time <- 5
   times <- 1:num_time
   
-  layer <- time_agg_abun(num_rules, num_time, times)
+  layer <- time_agg_abun_layer(num_rules, num_time, times)
   
   # Create input with some missing values (represented as zeros or NaN)
   x <- torch_rand(batch_size, num_rules, num_time)
@@ -146,8 +146,8 @@ test_that("temporal window width affects aggregation", {
   num_time <- 10
   times <- 1:num_time
   
-  layer_narrow <- time_agg_abun(num_rules, num_time, times)
-  layer_wide <- time_agg_abun(num_rules, num_time, times)
+  layer_narrow <- time_agg_abun_layer(num_rules, num_time, times)
+  layer_wide <- time_agg_abun_layer(num_rules, num_time, times)
   
   # Set different window widths
   with_no_grad({

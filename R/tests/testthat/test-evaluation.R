@@ -37,8 +37,8 @@ test_that("compute_metrics calculates confusion matrix correctly", {
   # FP = 1 (pred=0.7, label=0)
   # FN = 1 (pred=0.3, label=1)
   
-  expect_equal(cm["0", "0"], 1)  # TN
-  expect_equal(cm["1", "1"], 1)  # TP
+  expect_equal(cm["Pred 0", "True 0"], 1)  # TN
+  expect_equal(cm["Pred 1", "True 1"], 1)  # TP
   expect_equal(sum(cm), 4)
 })
 
