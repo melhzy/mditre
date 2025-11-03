@@ -1513,7 +1513,7 @@ def take_relative_abundance(data):
         abundances = new_data.X[i]
         # Data may be integer (counts): cast carefully
         # to float
-        total_abundances = np.sum(abundances, axis=0).astype(np.float)
+        total_abundances = np.sum(abundances, axis=0).astype(np.float64)
         relative_abundances = abundances/total_abundances
         new_data.X[i] = relative_abundances
     return new_data
@@ -1540,7 +1540,7 @@ def do_internal_normalization(data,
         target_abundances = abundances[target_indices, :]
         # Data may be integer (counts): cast carefully
         # to float
-        norm_factors = np.sum(target_abundances, axis=0).astype(np.float)
+        norm_factors = np.sum(target_abundances, axis=0).astype(np.float64)
         if not np.all(norm_factors > reject_threshold):
             bad_indices = np.where(norm_factors <= reject_threshold) 
             bad_timepoints = data.T[i][bad_indices]

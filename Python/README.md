@@ -105,13 +105,15 @@ If you use MDITRE in your research, please cite:
 
 ```bibtex
 @article{maringanti2022mditre,
-  title={Explainable Deep Relational Networks for Longitudinal Genomic Sequence Data},
-  author={Maringanti, Prem Sai and Saha, Rik and Nadimpalli, Sasank and Xu, Jinyang and Khodadadian, Arshan and Hiremath, Aditya and Variyar, Rishabh Sanjay and Dave, Krithika and Kennedy, Paul J and others},
+  title={MDITRE: Scalable and Interpretable Machine Learning for Predicting Host Status from Temporal Microbiome Dynamics},
+  author={Maringanti, Veda Sheersh and Bucci, Vanni and Gerber, Georg K},
   journal={mSystems},
   volume={7},
-  number={5},
+  number={3},
+  pages={e00132--22},
   year={2022},
-  publisher={American Society for Microbiology}
+  publisher={American Society for Microbiology},
+  doi={10.1128/msystems.00132-22}
 }
 ```
 

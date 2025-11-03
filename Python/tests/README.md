@@ -22,7 +22,7 @@
 
 ## Overview
 
-The MDITRE test suite is consolidated into a single comprehensive test file `test_all.py` that validates all aspects of the package based on the paper "Explainable Deep Relational Networks for Longitudinal Genomic Sequence Data" (Maringanti et al., 2022, mSystems).
+The MDITRE test suite is consolidated into a single comprehensive test file `test_all.py` that validates all aspects of the package based on the paper "MDITRE: Scalable and Interpretable Machine Learning for Predicting Host Status from Temporal Microbiome Dynamics" (Maringanti, Bucci, & Gerber, 2022, mSystems).
 
 **Key Features**:
 - ✅ Single integrated test file (no duplicates)
