@@ -16,7 +16,7 @@ All notebooks are now fully compatible with Google Colab! Click the badges below
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melhzy/mditre/blob/master/Python/jupyter/tutorials/Tutorial_Bokulich_16S_data.ipynb) **Tutorial 3** - Bokulich 16S Data
 
-> 💡 **Colab Setup**: Run cell #2 in each notebook to install packages and mount Google Drive. See [`COLAB_BADGES.md`](COLAB_BADGES.md) for detailed instructions.
+> 💡 **Colab Setup**: Run cell #2 in each notebook to install packages and mount Google Drive. See [`COLAB_SETUP_GUIDE.md`](COLAB_SETUP_GUIDE.md) for detailed setup instructions, troubleshooting, and feature comparison.
 
 ---
 
@@ -28,7 +28,6 @@ All notebooks are now fully compatible with Google Colab! Click the badges below
   - Uses 10 epochs for faster testing (configurable)
   - Demonstrates seeding module integration
   - Includes visualization of training curves and rule activations
-  - See `NOTEBOOK_FIXES.md` for implementation details
 
 ### Tutorials
 Located in `tutorials/` subdirectory:
