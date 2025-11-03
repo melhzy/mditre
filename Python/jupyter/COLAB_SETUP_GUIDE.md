@@ -7,12 +7,14 @@
 
 ## Quick Start
 
-All MDITRE Jupyter notebooks are fully compatible with Google Colab. Each notebook includes a setup cell that automatically:
-- Installs the MDITRE package
-- Mounts Google Drive for data access
+All MDITRE Jupyter notebooks are fully compatible with Google Colab. Each tutorial notebook includes setup cells that automatically:
+- Installs the MDITRE package from the Python subdirectory
+- Downloads required dataset files from GitHub
 - Configures the appropriate matplotlib backend
 
-**Just run Cell #2 in any notebook to get started!**
+**For tutorials: Run cells #2 and #3 to get started!**
+- Cell #2: Package installation and environment setup
+- Cell #3: Automatic dataset download (tutorials only)
 
 ---
 
@@ -71,17 +73,30 @@ print("✅ MDITRE installed\n")
 
 **Problem:** Data files located in local directory structure won't be accessible in Colab.
 
-**Solution:** Mount Google Drive for data access:
+**Solution:** Automatic dataset download from GitHub:
+
+All tutorial notebooks now include an automatic dataset download cell (right after the Colab setup cell) that downloads the required data files directly from GitHub. This eliminates the need to manually upload files or configure Google Drive paths.
 
 ```python
-# Mount Google Drive
-print("💾 Mounting Google Drive...")
+# Download dataset files (for Colab users)
+if IN_COLAB:
+    import os
+    import urllib.request
+    
+    # Create directory structure and download files
+    os.makedirs('./datasets/raw/david', exist_ok=True)
+    base_url = "https://raw.githubusercontent.com/melhzy/mditre/master/Python/jupyter/tutorials/datasets/raw/david/"
+    
+    # Downloads all required files automatically
+    for filename in files:
+        urllib.request.urlretrieve(base_url + filename, f'./datasets/raw/david/{filename}')
+```
+
+**Alternative:** Mount Google Drive if you prefer to use your own data files:
+
+```python
 from google.colab import drive
 drive.mount('/content/drive')
-print("✅ Drive mounted\n")
-
-print("📁 Please ensure your data files are in Google Drive at:")
-print("   /content/drive/MyDrive/mditre_data/")
 ```
 
 ---
